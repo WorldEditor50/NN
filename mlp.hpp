@@ -90,7 +90,7 @@ Mat<T> SOFTMAX(Mat<T>& X)
     return X;
 }
 
-template <typename T, bool needTrain = true>
+template <typename T, bool needTrain>
 class Layer
 {
 public:
@@ -225,7 +225,6 @@ public:
         W[from].uniformRandom();
         /* buffer for optimization */
         if (needTrain == true) {
-            E = Mat<T>(layerDim, 1);
             dW[from] = Mat<T>(layerDim, inputDim);
             Sw[from] = Mat<T>(layerDim, inputDim);
             Vw[from] = Mat<T>(layerDim, inputDim);
@@ -280,18 +279,19 @@ public:
 };
 
 template <typename T, bool needTrain = true>
-class MLP : public Graph<Layer<T> >
+class MLP : public Graph<Layer<T, needTrain> >
 {
 public:
    using DataType = T;
-   using DAG = Graph<Layer<T> >;
+   using DAG = Graph<Layer<T, needTrain> >;
    using InputParam = std::map<std::string, Mat<T> >;
    using InputParamVec = std::vector<InputParam>;
    using Target = std::vector<Mat<T> >;
+   using Targets = std::map<std::string, Mat<T> >;
 public:
     MLP(){}
     ~MLP(){}
-    void addLayer(const Layer<T> &layer, const std::string &layerName)
+    void addLayer(const Layer<T, needTrain> &layer, const std::string &layerName)
     {
         return DAG::insertVertex(layer, layerName);
     }
@@ -323,8 +323,8 @@ public:
             std::cout<<"invalid name"<<std::endl;
             return;
         }
-        Layer<T> &layer = DAG::getObject(to);
-        Layer<T> &preLayer = DAG::getObject(from);
+        auto &layer = DAG::getObject(to);
+        auto &preLayer = DAG::getObject(from);
         layer.connect(from, preLayer.layerDim);
         return DAG::insertEdge(from, to);
     }
@@ -341,8 +341,8 @@ public:
     void softUpdateTo(MLP &dst, double alpha)
     {
         for (int  current : DAG::topologySequence) {
-            Layer<T> &layer = DAG::getObject(current);
-            Layer<T> &dstLayer = dst.getObject(current);
+            auto &layer = DAG::getObject(current);
+            auto &dstLayer = dst.getObject(current);
             for (int  from : DAG::previous.at(current)) {
                 dstLayer.W[from] = dstLayer.W[from] * (1 - alpha) + layer.W[from] * alpha;
             }
@@ -357,13 +357,13 @@ public:
             return;
         }
         for (int current : DAG::topologySequence) {
-            Layer<T> &layer = DAG::getObject(current);
+            auto &layer = DAG::getObject(current);
             if (layer.layerType == INPUT) {
                 layer.O = layer.Activate(layer.W[0] * x.at(DAG::vertexs[current].name) + layer.B);
             } else {
                 Mat<T> s(layer.O.rows, layer.O.cols);
                 for (int from : DAG::previous[current]) {
-                    Layer<T> &preLayer = DAG::getObject(from);    
+                    auto &preLayer = DAG::getObject(from);
                     s += layer.W[from] * preLayer.O;
                 }
                 s += layer.B;
@@ -384,7 +384,7 @@ public:
         /* error backpropagate */
         for (int i = DAG::topologySequence.size() - 1; i >= 0; i--) {
             int current = DAG::topologySequence[i];
-            Layer<T> &layer = DAG::getObject(current);
+            auto &layer = DAG::getObject(current);
             if (layer.layerType == OUTPUT) {
                 /* calculate loss */
                 if (layer.lossType == CROSS_ENTROPY) {
@@ -394,7 +394,7 @@ public:
                 }
             } else {
                 for (int to : DAG::nexts[current]) {
-                    Layer<T> &nextLayer = DAG::getObject(to);
+                    auto &nextLayer = DAG::getObject(to);
                     layer.E += nextLayer.W[current].Tr() * nextLayer.E;
                 }
             }
@@ -402,7 +402,7 @@ public:
 
         /* calculate  gradient */
         for (int current : DAG::topologySequence) {
-            Layer<T> &layer = DAG::getObject(current);
+            auto &layer = DAG::getObject(current);
             if (layer.lossType == CROSS_ENTROPY) {
                 Mat<T> dy = layer.O - y;
                 layer.dW[0] += dy * layer.O.Tr();
@@ -413,11 +413,13 @@ public:
                     layer.dW[0] += dy * x[DAG::vertexs[current].name].Tr();
                 } else {
                     for (int from : DAG::previous.at(current)) {
-                        Layer<T> &preLayer = DAG::getObject(from);
+                        auto &preLayer = DAG::getObject(from);
                         layer.dW[from] += dy * preLayer.O.Tr();
                     }
-                    layer.dB += dy;
+
                 }
+                layer.dB += dy;
+                layer.E.zero();
             }
         }
         return;
@@ -429,10 +431,15 @@ public:
             return;
         }
         for (int current : DAG::topologySequence) {
-            Layer<T> &layer = DAG::getObject(current);
-            for (int from : DAG::previous.at(current)) {
-                layer.W[from] -= layer.dW[from] * learningRate;
-                layer.dW[from].zero();
+            auto &layer = DAG::getObject(current);
+            if (layer.layerType == INPUT) {
+                layer.W[0] -= layer.dW[0] * learningRate;
+                layer.dW[0].zero();
+            } else {
+                for (int from : DAG::previous.at(current)) {
+                    layer.W[from] -= layer.dW[from] * learningRate;
+                    layer.dW[from].zero();
+                }
             }
             layer.B -= layer.dB * learningRate;
             layer.dB.zero();
@@ -446,11 +453,17 @@ public:
             return;
         }
         for (int current : DAG::topologySequence) {
-            Layer<T> &layer = DAG::getObject(current);
-            for (int from : DAG::previous.at(current)) {
-                layer.Sw[from] = layer.Sw[from] * rho + (layer.dW[from] % layer.dW[from]) * (1 - rho);
-                layer.W[from] -= layer.dW[from] / (SQRT(layer.Sw[from]) + 1e-9) * learningRate;
-                layer.dW[from].zero();
+            auto&layer = DAG::getObject(current);
+            if (layer.layerType == INPUT) {
+                layer.Sw[0] = layer.Sw[0] * rho + (layer.dW[0] % layer.dW[0]) * (1 - rho);
+                layer.W[0] -= layer.dW[0] / (SQRT(layer.Sw[0]) + 1e-9) * learningRate;
+                layer.dW[0].zero();
+            } else {
+                for (int from : DAG::previous.at(current)) {
+                    layer.Sw[from] = layer.Sw[from] * rho + (layer.dW[from] % layer.dW[from]) * (1 - rho);
+                    layer.W[from] -= layer.dW[from] / (SQRT(layer.Sw[from]) + 1e-9) * learningRate;
+                    layer.dW[from].zero();
+                }
             }
             layer.Sb = layer.Sb * rho + (layer.dB % layer.dB) * (1 - rho);
             layer.B -= layer.dB / (SQRT(layer.Sb) + 1e-9)* learningRate;
@@ -465,16 +478,25 @@ public:
             return;
         }
         for (int current : DAG::topologySequence) {
-            Layer<T> &layer = DAG::getObject(current);
+            auto& layer = DAG::getObject(current);
             layer.alpha1 *= alpha1;
             layer.alpha2 *= alpha2;
-            for (int from : DAG::previous.at(current)) {
-                layer.Vw[from] = layer.Vw[from] * alpha1 + layer.dW[from] * (1 - alpha1);
-                layer.Sw[from] = layer.Sw[from] * alpha2 + (layer.dW[from] % layer.dW[from]) * (1 - alpha2);
-                Mat<T> Vwt = layer.Vw[from] / (1 - layer.alpha1);
-                Mat<T> Swt = layer.Sw[from] / (1 - layer.alpha2);
-                layer.W[from] -= Vwt / (SQRT(Swt) + 1e-9) * learningRate;
-                layer.dW[from].zero();
+            if (layer.layerType == INPUT) {
+                layer.Vw[0] = layer.Vw[0] * alpha1 + layer.dW[0] * (1 - alpha1);
+                layer.Sw[0] = layer.Sw[0] * alpha2 + (layer.dW[0] % layer.dW[0]) * (1 - alpha2);
+                Mat<T> Vwt = layer.Vw[0] / (1 - layer.alpha1);
+                Mat<T> Swt = layer.Sw[0] / (1 - layer.alpha2);
+                layer.W[0] -= Vwt / (SQRT(Swt) + 1e-9) * learningRate;
+                layer.dW[0].zero();
+            } else {
+                for (int from : DAG::previous.at(current)) {
+                    layer.Vw[from] = layer.Vw[from] * alpha1 + layer.dW[from] * (1 - alpha1);
+                    layer.Sw[from] = layer.Sw[from] * alpha2 + (layer.dW[from] % layer.dW[from]) * (1 - alpha2);
+                    Mat<T> Vwt = layer.Vw[from] / (1 - layer.alpha1);
+                    Mat<T> Swt = layer.Sw[from] / (1 - layer.alpha2);
+                    layer.W[from] -= Vwt / (SQRT(Swt) + 1e-9) * learningRate;
+                    layer.dW[from].zero();
+                }
             }
             layer.Vb = layer.Vb * alpha1 + layer.dB * (1 - alpha1);
             layer.Sb = layer.Sb * alpha2 + (layer.dB % layer.dB) * (1 - alpha2);
@@ -519,7 +541,7 @@ public:
             return;
         }
         for (int i : DAG::topologySequence) {
-            Layer<T> &layer = DAG::getObject(i);
+            auto &layer = DAG::getObject(i);
             for (int from : DAG::previous.at(i)) {
                 layer.W[from].load(fileName);
             }
@@ -537,7 +559,7 @@ public:
             return;
         }
         for (int i : DAG::topologySequence) {
-            Layer<T> &layer = DAG::getObject(i);
+            auto &layer = DAG::getObject(i);
             for (int from : DAG::previous.at(i)) {
                 layer.W[from].save(fileName);
             }

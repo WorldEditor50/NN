@@ -49,6 +49,8 @@ template<typename T>
 class Graph
 {
 public:
+    using DataType = T;
+public:
     std::vector<Vertex<T> > vertexs;
     std::vector<Edge> edges;
     std::vector<int> topologySequence;
@@ -143,7 +145,7 @@ public:
 
     inline T& getObject(int index)
     {
-        return vertexs[index].object;
+        return vertexs.at(index).object;
     }
     std::vector<int> findNext(int index)
     {

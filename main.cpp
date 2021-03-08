@@ -65,22 +65,26 @@ void test_xor()
     BPNN bp;
     /* add layer */
     std::cout<<"add layer"<<std::endl;
-    bp.addLayer(INPUT, RELU, MSE, 4, 2, "input");
-    bp.addLayer(HIDDEN, RELU, MSE, 4, "hidden1");
-    bp.addLayer(OUTPUT, RELU, MSE, 1, "output");
+    bp.addLayer(INPUT, SIGMOID, MSE, 4, 2, "input");
+    bp.addLayer(HIDDEN, SIGMOID, MSE, 4, "hidden1");
+    bp.addLayer(HIDDEN, SIGMOID, MSE, 4, "hidden2");
+    bp.addLayer(OUTPUT, SIGMOID, MSE, 1, "output");
     /* connect */
     std::cout<<"connect"<<std::endl;
     bp.connectLayer("input", "hidden1");
+    bp.connectLayer("input", "hidden2");
+    bp.connectLayer("input", "output");
     bp.connectLayer("hidden1", "output");
+    bp.connectLayer("hidden2", "output");
     if (!bp.generate()) {
         std::cout<<"failed mlp is not DAG";
         return;
     }
-    std::cout<<"topology"<<std::endl;
+    std::cout<<"topology:"<<std::endl;
     bp.showTopology();
     bp.show();
     /* train */
-    std::cout<<"train"<<std::endl;
+    std::cout<<"training:"<<std::endl;
     BPNN::InputParamVec x(4);
     for (int i = 0; i < 4; i++) {
         x[i]["input"] = Mat<double>(2, 1);
@@ -101,13 +105,13 @@ void test_xor()
     y[1][0][0] = 1;
     y[2][0][0] = 1;
     y[3][0][0] = 0;
-    for (int i = 0; i < 0; i++) {
-        for (int j = 0; j < 100; j++) {
+    for (int i = 0; i < 10000; i++) {
+        for (int j = 0; j < 4; j++) {
             int k = rand() % 4;
             bp.feedForward(x[k]);
             bp.gradient(x[k], y[k]);
         }
-        bp.SGD(0.01);
+        bp.RMSProp(0.9, 0.01);
     }
     /* classify */
     std::cout<<"classify"<<std::endl;
