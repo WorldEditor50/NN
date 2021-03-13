@@ -1,4 +1,3 @@
-#include "graph.hpp"
 #include "mlp.hpp"
 
 void test_DAG()
@@ -7,14 +6,14 @@ void test_DAG()
     MLP<double> mlp;
     /* add layer */
     std::cout<<"add layer"<<std::endl;
-    mlp.addLayer(INPUT, SIGMOID, MSE, 4, 4, "input1");
-    mlp.addLayer(INPUT, SIGMOID, MSE, 4, 4, "input2");
-    mlp.addLayer(INPUT, SIGMOID, MSE, 4, 4, "input3");
-    mlp.addLayer(INPUT, SIGMOID, MSE, 4, 4, "input4");
-    mlp.addLayer(HIDDEN, SIGMOID, MSE, 8, "hidden1");
-    mlp.addLayer(HIDDEN, SIGMOID, MSE, 8, "hidden2");
-    mlp.addLayer(HIDDEN, SIGMOID, MSE, 8, "hidden3");
-    mlp.addLayer(OUTPUT, SIGMOID, MSE, 4, "output");
+    mlp.addLayer(INPUT, ACTIVE_SIGMOID, MSE, 4, 4, "input1");
+    mlp.addLayer(INPUT, ACTIVE_SIGMOID, MSE, 4, 4, "input2");
+    mlp.addLayer(INPUT, ACTIVE_SIGMOID, MSE, 4, 4, "input3");
+    mlp.addLayer(INPUT, ACTIVE_SIGMOID, MSE, 4, 4, "input4");
+    mlp.addLayer(HIDDEN, ACTIVE_SIGMOID, MSE, 8, "hidden1");
+    mlp.addLayer(HIDDEN, ACTIVE_SIGMOID, MSE, 8, "hidden2");
+    mlp.addLayer(HIDDEN, ACTIVE_SIGMOID, MSE, 8, "hidden3");
+    mlp.addLayer(OUTPUT, ACTIVE_SIGMOID, MSE, 4, "output");
     /* connection */
     std::cout<<"connect"<<std::endl;
     mlp.connectLayer("input1", "hidden1");
@@ -36,7 +35,7 @@ void test_DAG()
 
     /* feed forward */
     std::cout<<"feed forward"<<std::endl;
-    MLP<double>::InputParam x;
+    MLP<double>::Input x;
     x["input1"] = Mat<double>(4, 1);
     x["input2"] = Mat<double>(4, 1);
     x["input3"] = Mat<double>(4, 1);
@@ -60,15 +59,22 @@ void test_DAG()
 
 void test_xor()
 {
+    /*
+                  +-->-hidden1-->--+
+                  |                |
+        input -->-|----->----------|-->-- output
+                  |                |
+                  +-->-hidden2-->--+
+    */
     std::cout<<"mlp"<<std::endl;
     using BPNN = MLP<double, true>;
     BPNN bp;
     /* add layer */
     std::cout<<"add layer"<<std::endl;
-    bp.addLayer(INPUT, SIGMOID, MSE, 4, 2, "input");
-    bp.addLayer(HIDDEN, SIGMOID, MSE, 4, "hidden1");
-    bp.addLayer(HIDDEN, SIGMOID, MSE, 4, "hidden2");
-    bp.addLayer(OUTPUT, SIGMOID, MSE, 1, "output");
+    bp.addLayer(INPUT, ACTIVE_RELU, MSE, 4, 2, "input");
+    bp.addLayer(HIDDEN, ACTIVE_RELU, MSE, 4, "hidden1");
+    bp.addLayer(HIDDEN, ACTIVE_RELU, MSE, 4, "hidden2");
+    bp.addLayer(OUTPUT, ACTIVE_RELU, MSE, 1, "output");
     /* connect */
     std::cout<<"connect"<<std::endl;
     bp.connectLayer("input", "hidden1");
@@ -85,7 +91,7 @@ void test_xor()
     bp.show();
     /* train */
     std::cout<<"training:"<<std::endl;
-    BPNN::InputParamVec x(4);
+    BPNN::InputVec x(4);
     for (int i = 0; i < 4; i++) {
         x[i]["input"] = Mat<double>(2, 1);
     }
@@ -111,7 +117,7 @@ void test_xor()
             bp.feedForward(x[k]);
             bp.gradient(x[k], y[k]);
         }
-        bp.RMSProp(0.9, 0.01);
+        bp.SGD(0.01);
     }
     /* classify */
     std::cout<<"classify"<<std::endl;

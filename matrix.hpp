@@ -4,6 +4,7 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <functional>
 #include <cmath>
 #include <ctime>
 #include <cstdlib>
@@ -11,8 +12,7 @@
 namespace ML {
 
 enum MatType{
-    NONE = 0,
-    ZERO,
+    ZERO = 0,
     IDENTITY,
     UNIFORM_RAND
 };
@@ -26,7 +26,7 @@ public:
 public:
 	Mat():rows(0), cols(0){}
     ~Mat(){}
-    inline bool isSizeEqual(const Mat<T>& x) {return (rows == x.rows && cols == x.cols);}
+    inline bool isSizeEqual(const Mat<T>& x){return (rows == x.rows && cols == x.cols);}
     inline bool isNull(){return rows == 0 || cols == 0;}
     inline bool isSquare(){return rows == cols;}
     inline T& at(int row, int col){return data[row][col];}
@@ -59,11 +59,60 @@ public:
         }
         return;
     }
+   void identity()
+    {
+        if (!isSquare()) {
+            return;
+        }
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                if (i == j) {
+                    data[i][j] = 1;
+                } else {
+                    data[i][j] = 0;
+                }
+            }
+        }
+        return;
+    }
 
-    Mat(int rows, int cols)
+    void random(int minValue, int maxValue)
+    {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                data[i][j] = T(minValue + rand() % (maxValue - minValue));
+            }
+        }
+        return;
+    }
+
+    void uniformRandom()
+    {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                data[i][j] = T(rand() % 10000 - rand() % 10000) / 10000;
+            }
+        }
+        return;
+    }
+
+    Mat(int rows, int cols, MatType type = ZERO)
     {
         create(rows, cols);
-        assign(0);
+        switch (type) {
+        case ZERO:
+            assign(0);
+            break;
+        case IDENTITY:
+            identity();
+            break;
+        case UNIFORM_RAND:
+            uniformRandom();
+            break;
+        default:
+            break;
+        }
+
     }
 
     Mat(const Mat<T>& x)
@@ -84,7 +133,7 @@ public:
             create(x.rows, x.cols);
         }
         if (!isSizeEqual(x)) {
-            std::cout<<"= size not equal"<<std::endl;
+            std::cout<<"= size is not matched"<<std::endl;
             return *this;
         }
         assign(x);
@@ -92,43 +141,6 @@ public:
     }
 
     void zero(){ assign(0);}
-
-    void identity()
-    {
-        if (isSquare()) {
-            return;
-        }
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                if (i == j) {
-                    data[i][j] = 1;
-                } else {
-                    data[i][j] = 0;
-                }
-            }
-        }
-        return;
-    }
-
-    void random(int n)
-    {
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                data[i][j] = T(rand() % n);
-            }
-        }
-        return;
-    }
-
-    void uniformRandom()
-    {
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                data[i][j] = T(rand() % 10000 - rand() % 10000) / 10000;
-            }
-        }
-        return;
-    }
 
     std::vector<T> column(int col)
     {
@@ -168,7 +180,7 @@ public:
     Mat<T> operator + (const Mat<T>& x)
     {
         if (!isSizeEqual(x)) {
-            std::cout<<"+ size not equal"<<std::endl;
+            std::cout<<"+ size is not matched"<<std::endl;
             return *this;
         }
         Mat<T> y(rows, cols);
@@ -183,7 +195,7 @@ public:
     Mat<T> operator - (const Mat<T>& x)
     {
         if (!isSizeEqual(x)) {
-            std::cout<<"- size not equal"<<std::endl;
+            std::cout<<"- size is not matched"<<std::endl;
             return *this;
         }
         Mat<T> y(rows, cols);
@@ -198,7 +210,7 @@ public:
     Mat<T> operator * (const Mat<T>& x)
     {
         if (cols != x.rows) {
-            std::cout<<"* size not equal"<<std::endl;
+            std::cout<<"* size is not matched"<<std::endl;
             return *this;
         }
         /* (m, p) x (p, n) = (m, n) */
@@ -219,7 +231,7 @@ public:
     Mat<T> operator / (const Mat<T>& x)
     {
         if (!isSizeEqual(x)) {
-            std::cout<<"/ size not equal"<<std::endl;
+            std::cout<<"/ size is not matched"<<std::endl;
             return *this;
         }
         Mat<T> y(rows, cols);
@@ -234,7 +246,7 @@ public:
     Mat<T> operator % (const Mat<T>& x)
     {
         if (!isSizeEqual(x)) {
-            std::cout<<"% size not equal"<<std::endl;
+            std::cout<<"% size is not matched"<<std::endl;
             return *this;
         }
         Mat<T> y(rows, cols);
@@ -249,7 +261,7 @@ public:
     Mat<T>& operator += (const Mat<T>& x)
     {
         if (!isSizeEqual(x)) {
-            std::cout<<"+= size not equal"<<std::endl;
+            std::cout<<"+= size is not matched"<<std::endl;
             return *this;
         }
         for (int i = 0; i < rows; i++) {
@@ -263,7 +275,7 @@ public:
     Mat<T>& operator -= (const Mat<T>& x)
     {
         if (!isSizeEqual(x)) {
-            std::cout<<"-= size not equal"<<std::endl;
+            std::cout<<"-= size is not matched"<<std::endl;
             return *this;
         }
         for (int i = 0; i < rows; i++) {
@@ -277,7 +289,7 @@ public:
     Mat<T>& operator /= (const Mat<T>& x)
     {
         if (!isSizeEqual(x)) {
-            std::cout<<"/= size not equal"<<std::endl;
+            std::cout<<"/= size is not matched"<<std::endl;
             return *this;
         }
         for (int i = 0; i < rows; i++) {
@@ -291,7 +303,7 @@ public:
     Mat<T>& operator %= (const Mat<T>& x)
     {
         if (!isSizeEqual(x)) {
-            std::cout<<"%= size not equal"<<std::endl;
+            std::cout<<"%= size is not matched"<<std::endl;
             return *this;
         }
         for (int i = 0; i < rows; i++) {
@@ -489,6 +501,42 @@ T min(Mat<T>& x)
         }
     }
     return minT;
+}
+inline double sigmoid(double x){return exp(x) / (exp(x) + 1);}
+inline double relu(double x){return x > 0 ? x : 0;}
+inline double linear(double x){return x;}
+inline double dsigmoid(double y){return y * (1 - y);}
+inline double drelu(double y){return y > 0 ? 1 : 0;}
+inline double dtanh(double y){return 1 - y * y;}
+template <typename T>
+Mat<T> LOG(const Mat<T> &x){return for_each(x, log);}
+template <typename T>
+Mat<T> EXP(const Mat<T> &x){return for_each(x, exp);}
+template <typename T>
+Mat<T> SQRT(const Mat<T> &x){return for_each(x, sqrt);}
+template <typename T>
+Mat<T> RELU(const Mat<T> &x){return for_each(x, relu);}
+template <typename T>
+Mat<T> LINEAR(const Mat<T> &x){return x;}
+template <typename T>
+Mat<T> TANH(const Mat<T> &x){return for_each(x, tanh);}
+template <typename T>
+Mat<T> SIGMOID(const Mat<T> &x){return for_each(x, sigmoid);}
+template <typename T>
+Mat<T> DRELU(const Mat<T> &x){return for_each(x, drelu);}
+template <typename T>
+Mat<T> DTANH(const Mat<T> &y){return for_each(y, dtanh);}
+template <typename T>
+Mat<T> DSIGMOID(const Mat<T> &y){return for_each(y, dsigmoid);}
+template <typename T>
+Mat<T> DLINEAR(const Mat<T> &x){ Mat<T> y(x); y.assign(1);return y;}
+template <typename T>
+Mat<T> SOFTMAX(Mat<T>& x)
+{
+    T maxValue = max(x);
+    Mat<T> delta = EXP(x - maxValue);
+    T s = sum(delta);
+    return delta / (s + 1e-9);
 }
 }
 #endif // MATRIx_H

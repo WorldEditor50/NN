@@ -24,5 +24,6 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     graph.hpp \
+    lstm.hpp \
     matrix.hpp \
     mlp.hpp

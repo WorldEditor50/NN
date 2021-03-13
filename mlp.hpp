@@ -4,6 +4,7 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <functional>
 #include <map>
 #include <cmath>
 #include <ctime>
@@ -12,13 +13,6 @@
 #include "graph.hpp"
 using namespace ML;
 
-/* activate method */
-enum ActiveType {
-    SIGMOID = 0,
-    TANH,
-    RELU,
-    LINEAR
-};
 /* Optimize method */
 enum OptType {
     OPT_NONE = 0,
@@ -37,135 +31,118 @@ enum LayerType {
   HIDDEN,
   OUTPUT
 };
+/* activate method */
+enum ActiveType {
+    ACTIVE_SIGMOID = 0,
+    ACTIVE_TANH,
+    ACTIVE_RELU,
+    ACTIVE_LINEAR
+};
 
-double sigmoid(double x)
-{
-    return exp(x) / (exp(x) + 1);
-}
-double relu(double x)
-{
-    return x > 0 ? x : 0;
-}
-double linear(double x)
-{
-    return x;
-}
-double dsigmoid(double y)
-{
-    return y * (1 - y);
-}
-double drelu(double y)
-{
-    return y > 0 ? 1 : 0;
-}
-double dtanh(double y)
-{
-    return 1 - y * y;
-}
 template <typename T>
-Mat<T> LOG(Mat<T> X)
-{
-    return for_each(X, log);
-}
-template <typename T>
-Mat<T> EXP(Mat<T> X)
-{
-    return for_each(X, exp);
-}
-template <typename T>
-Mat<T> SQRT(Mat<T> X)
-{
-    return for_each(X, sqrt);
-}
-template <typename T>
-Mat<T> SOFTMAX(Mat<T>& X)
-{
-    /* softmax works in multi-classify */
-    T maxValue = max(X);
-    Mat<T> delta = EXP(X - maxValue);
-    float s = sum(delta);
-    if (s != 0) {
-        X = delta / s;
-    }
-    return X;
-}
-
-template <typename T, bool needTrain>
-class Layer
+class OptNull
 {
 public:
-    std::map<int, Mat<T> > W;
-    Mat<T> B;
-    Mat<T> O;
-    Mat<T> E;
-    /* paramter */
-    int layerDim;
-    int inputDim;
-    ActiveType activeType;
-    LossType lossType;
-    LayerType layerType;
-    /* buffer for optimization */
+    OptNull(){}
+    void copyFrom(const OptNull &){}
+    void init(LayerType , int , int ){}
+    void connect(int , int , int){}
+};
+
+template <typename T>
+class OptParam
+{
+public:
     std::map<int, Mat<T> > dW;
     std::map<int, Mat<T> > Sw;
     std::map<int, Mat<T> > Vw;
     Mat<T> dB;
     Mat<T> Sb;
     Mat<T> Vb;
+    Mat<T> E;
     double alpha1;
     double alpha2;
 public:
-    Layer():layerDim(0), inputDim(0), alpha1(1), alpha2(1){}
+     OptParam():alpha1(1), alpha2(1){}
+     void copyFrom(const OptParam &param)
+     {
+         if (this == &param) {
+             return;
+         }
+         dW = param.dW;
+         Sw = param.Sw;
+         Vw = param.Vw;
+         dB = param.dB;
+         Sb = param.Sb;
+         Vb = param.Vb;
+         E = param.E;
+         alpha1 = param.alpha1;
+         alpha2 = param.alpha2;
+         return;
+     }
+     void init(LayerType layerType, int layerDim, int inputDim)
+     {
+         if (layerType == INPUT) {
+             dW[0] = Mat<T>(layerDim, inputDim);
+             Sw[0] = Mat<T>(layerDim, inputDim);
+             Vw[0] = Mat<T>(layerDim, inputDim);
+         }
+         E = Mat<T>(layerDim, 1);
+         dB = Mat<T>(layerDim, 1);
+         Sb = Mat<T>(layerDim, 1);
+         Vb = Mat<T>(layerDim, 1);
+         return;
+     }
+     void connect(int from, int layerDim, int inputDim)
+     {
+         dW[from] = Mat<T>(layerDim, inputDim);
+         Sw[from] = Mat<T>(layerDim, inputDim);
+         Vw[from] = Mat<T>(layerDim, inputDim);
+         return;
+     }
+};
+
+template <typename T, bool onTrain>
+class Layer:public std::conditional<onTrain, OptParam<T>, OptNull<T> >::type
+{
+public:
+    using TOpt = typename std::conditional<onTrain, OptParam<T>, OptNull<T> >::type;
+public:
+    std::map<int, Mat<T> > W;
+    Mat<T> B;
+    Mat<T> O;
+    /* paramter */
+    int layerDim;
+    int inputDim;
+    ActiveType activeType;
+    LossType lossType;
+    LayerType layerType;
+public:
+    Layer():layerDim(0), inputDim(0){}
     virtual ~Layer(){}
-    Layer(const Layer& layer)
+    void copyFrom(const Layer& layer)
     {
         W = layer.W;
         B = layer.B;
         O = layer.O;
-        E = layer.E;
         /* paramter */
         layerDim = layer.layerDim;
         inputDim = layer.inputDim;
         activeType = layer.activeType;
         lossType = layer.lossType;
         layerType = layer.layerType;
-        /* buffer for optimization */
-        if (needTrain == true) {
-            dW = layer.dW;
-            Sw = layer.Sw;
-            Vw = layer.Vw;
-            dB = layer.dB;
-            Sb = layer.Sb;
-            Vb = layer.Vb;
-            alpha1 = 1;
-            alpha2 = 1;
-        }
+        return TOpt::copyFrom(layer);
+    }
+    Layer(const Layer& layer)
+    {
+        copyFrom(layer);
     }
     Layer& operator = (const Layer& layer)
     {
         if (this == &layer) {
             return *this;
         }
-        W = layer.W;
-        B = layer.B;
-        O = layer.O;
-        E = layer.E;
-        /* paramter */
-        layerDim = layer.layerDim;
-        inputDim = layer.inputDim;
-        activeType = layer.activeType;
-        lossType = layer.lossType;
-        layerType = layer.layerType;
-        /* buffer for optimization */
-        if (needTrain == true) {
-            dW = layer.dW;
-            Sw = layer.Sw;
-            Vw = layer.Vw;
-            dB = layer.dB;
-            Sb = layer.Sb;
-            Vb = layer.Vb;
-            alpha1 = 1;
-            alpha2 = 1;
-        }
+        copyFrom(layer);
         return *this;
     }
     Layer(LayerType layerType,
@@ -177,17 +154,9 @@ public:
         this->lossType = lossType;
         this->activeType = activeType;
         this->layerType = layerType;
-        this->alpha1 = 1;
-        this->alpha2 = 1;
-        B = Mat<T>(layerDim, 1);
-        B.uniformRandom();
+        B = Mat<T>(layerDim, 1, UNIFORM_RAND);
         O = Mat<T>(layerDim, 1);
-        if (needTrain == true) {
-            E = Mat<T>(layerDim, 1);
-            dB = Mat<T>(layerDim, 1);
-            Sb = Mat<T>(layerDim, 1);
-            Vb = Mat<T>(layerDim, 1);
-        }
+        TOpt::init(layerType, layerDim, 1);
     }
 
     Layer(LayerType layerType,
@@ -201,49 +170,31 @@ public:
         this->lossType = lossType;
         this->activeType = activeType;
         this->layerType = layerType;
-        this->alpha1 = 1;
-        this->alpha2 = 1;
-        W[0] = Mat<T>(layerDim, inputDim);
-        W[0].uniformRandom();
-        B = Mat<T>(layerDim, 1);
-        B.uniformRandom();
+        W[0] = Mat<T>(layerDim, inputDim, UNIFORM_RAND);
+        B = Mat<T>(layerDim, 1, UNIFORM_RAND);
         O = Mat<T>(layerDim, 1);
-        if (needTrain == true) {
-            dW[0] = Mat<T>(layerDim, inputDim);
-            Sw[0] = Mat<T>(layerDim, inputDim);
-            Vw[0] = Mat<T>(layerDim, inputDim);
-            E = Mat<T>(layerDim, 1);
-            dB = Mat<T>(layerDim, 1);
-            Sb = Mat<T>(layerDim, 1);
-            Vb = Mat<T>(layerDim, 1);
-        }
+        TOpt::init(layerType, layerDim, inputDim);
     }
 
     void connect(int from, int inputDim)
     {
-        W[from] = Mat<T>(layerDim, inputDim);
-        W[from].uniformRandom();
-        /* buffer for optimization */
-        if (needTrain == true) {
-            dW[from] = Mat<T>(layerDim, inputDim);
-            Sw[from] = Mat<T>(layerDim, inputDim);
-            Vw[from] = Mat<T>(layerDim, inputDim);
-        }
+        W[from] = Mat<T>(layerDim, inputDim, UNIFORM_RAND);
+        return TOpt::connect(from, layerDim, inputDim);
     }
     Mat<T> Activate(const Mat<T> &x)
     {
         Mat<T> y;
         switch (activeType) {
-            case SIGMOID:
+            case ACTIVE_SIGMOID:
                 y = for_each(x, sigmoid);
                 break;
-            case RELU:
+            case ACTIVE_RELU:
                 y = for_each(x, relu);
                 break;
-            case TANH:
+            case ACTIVE_TANH:
                 y = for_each(x, tanh);
                 break;
-            case LINEAR:
+            case ACTIVE_LINEAR:
                 y = x;
                 break;
             default:
@@ -257,16 +208,16 @@ public:
     {
         Mat<T> dy;
         switch (activeType) {
-            case SIGMOID:
+            case ACTIVE_SIGMOID:
                 dy = for_each(y, dsigmoid);
                 break;
-            case RELU:
+            case ACTIVE_RELU:
                 dy = for_each(y, drelu);
                 break;
-            case TANH:
+            case ACTIVE_TANH:
                 dy = for_each(y, dtanh);
                 break;
-            case LINEAR:
+            case ACTIVE_LINEAR:
                 dy = y;
                 dy.assign(1);
                 break;
@@ -278,20 +229,20 @@ public:
     }
 };
 
-template <typename T, bool needTrain = true>
-class MLP : public Graph<Layer<T, needTrain> >
+template <typename T, bool onTrain = true>
+class MLP : public Graph<Layer<T, onTrain> >
 {
 public:
    using DataType = T;
-   using DAG = Graph<Layer<T, needTrain> >;
-   using InputParam = std::map<std::string, Mat<T> >;
-   using InputParamVec = std::vector<InputParam>;
+   using DAG = Graph<Layer<T, onTrain> >;
+   using Input = std::map<std::string, Mat<T> >;
+   using InputVec = std::vector<Input>;
    using Target = std::vector<Mat<T> >;
    using Targets = std::map<std::string, Mat<T> >;
 public:
     MLP(){}
     ~MLP(){}
-    void addLayer(const Layer<T, needTrain> &layer, const std::string &layerName)
+    void addLayer(const Layer<T, onTrain> &layer, const std::string &layerName)
     {
         return DAG::insertVertex(layer, layerName);
     }
@@ -302,7 +253,7 @@ public:
                   int layerDim,
                   const std::string &layerName)
     {
-        return DAG::insertVertex(Layer<T, needTrain>(layerType, activeType, lossType, layerDim), layerName);
+        return DAG::insertVertex(Layer<T, onTrain>(layerType, activeType, lossType, layerDim), layerName);
     }
 
     void addLayer(LayerType layerType,
@@ -312,7 +263,7 @@ public:
                   int inputDim,
                   const std::string &layerName)
     {
-        return DAG::insertVertex(Layer<T, needTrain>(layerType, activeType, lossType, layerDim, inputDim), layerName);
+        return DAG::insertVertex(Layer<T, onTrain>(layerType, activeType, lossType, layerDim, inputDim), layerName);
     }
 
     void connectLayer(const std::string &fromName, const std::string &toName)
@@ -351,7 +302,7 @@ public:
         return;
     }
 
-    void feedForward(const InputParam &x)
+    void feedForward(const Input &x)
     {
         if (!DAG::isDAG()) {
             return;
@@ -376,7 +327,7 @@ public:
         return;
     }
 
-    void gradient(InputParam &x, Mat<T> &y)
+    void gradient(Input &x, Mat<T> &y)
     {
         if (!DAG::isDAG()) {
             return;
