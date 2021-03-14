@@ -125,10 +125,18 @@ void test_xor()
         bp.feedForward(x[i]);
         bp.show();
     }
+    /* clone */
+    std::cout<<"clone:"<<std::endl;
+    MLP<double, false> predictNet = bp.clone();
+    predictNet.showTopology();
+    for (int i = 0; i < 4; i++) {
+        predictNet.feedForward(x[i]);
+        predictNet.show();
+    }
     return;
 }
 
-int main(int argc, char *argv[])
+int main()
 {
     srand((unsigned int)time(nullptr));
     test_xor();

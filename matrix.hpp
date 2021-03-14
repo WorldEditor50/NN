@@ -41,7 +41,15 @@ public:
         }
         return *this;
     }
-
+    void expand(std::function<void(int, int)> func)
+    {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                func(i, j);
+            }
+        }
+        return;
+    }
     void assign(const Mat<T>& x)
     {
         for (int i = 0; i < rows; i++) {
@@ -52,47 +60,31 @@ public:
 
     void assign(T x)
     {
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                data[i][j] = x;
-            }
-        }
+        expand([this, x](int i, int j){data[i][j] = x;});
         return;
     }
-   void identity()
+    void identity()
     {
         if (!isSquare()) {
             return;
         }
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                if (i == j) {
-                    data[i][j] = 1;
-                } else {
-                    data[i][j] = 0;
-                }
-            }
-        }
+        expand([this](int i, int j){data[i][j] = T(i == j);});
         return;
     }
 
     void random(int minValue, int maxValue)
     {
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                data[i][j] = T(minValue + rand() % (maxValue - minValue));
-            }
-        }
+        expand([this, minValue, maxValue](int i, int j){
+            data[i][j] = T(minValue + rand() % (maxValue - minValue));
+        });
         return;
     }
 
     void uniformRandom()
     {
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                data[i][j] = T(rand() % 10000 - rand() % 10000) / 10000;
-            }
-        }
+        expand([this](int i, int j){
+            data[i][j] = T(rand() % 10000 - rand() % 10000) / 10000;
+        });
         return;
     }
 
@@ -145,24 +137,18 @@ public:
     std::vector<T> column(int col)
     {
         std::vector<T> columnT;
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                if (j == col) {
-                    columnT.push_back(data[i][j]);
-                }
+        expand([this, &columnT, col](int i, int j){
+            if (j == col) {
+                columnT.push_back(data[i][j]);
             }
-        }
+        });
         return columnT;
     }
 
     std::vector<T> toVector()
     {
         std::vector<T> x;
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                x.push_back(data[i][j]);
-            }
-        }
+        expand([this, &x](int i, int j){x.push_back(data[i][j]);});
         return x;
     }
 
@@ -390,29 +376,12 @@ public:
 
     Mat<T>& operator /= (T x)
     {
-        if (x == 0) {
-            return *this;
-        }
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 data[i][j] /= x;
             }
         }
         return *this;
-    }
-
-    T mean(Mat<T>& x)
-    {
-        T s = 0;
-        T n = 0;
-        for (int i = 0; i < x.rows; i++) {
-            for (int j = 0; j < x.cols; j++) {
-                s += x.data[i][j];
-                n++;
-            }
-        }
-        s = s / n;
-        return s;
     }
 
     Mat<T> Tr()
@@ -426,6 +395,30 @@ public:
         return y;
     }
 
+    Mat<T> subset(int fromRow, int fromCol, int rowOffset, int colOffset)
+    {
+        Mat<T> y(rowOffset, colOffset);
+        int r = (fromRow + rowOffset > rows)?rows:(fromRow + rowOffset);
+        int c = (fromCol + colOffset > cols)?cols:(fromCol + colOffset);
+        for (int i = fromRow; i < r; i++) {
+            for (int j = fromCol; j < c; j++) {
+                y.data[i - fromRow][j - fromCol] = data[i][j];
+            }
+        }
+        return y;
+    }
+
+    void set(int fromRow, int fromCol, const Mat<T> &x)
+    {
+        int r = (fromRow + x.rows > rows)?rows:(fromRow + x.rows);
+        int c = (fromCol + x.cols > cols)?cols:(fromCol + x.cols);
+        for (int i = fromRow; i < r; i++) {
+            for (int j = fromCol; j < c; j++) {
+                data[i][j] = x.data[i - fromRow][j - fromCol];
+            }
+        }
+        return;
+    }
     void save(const std::string& fileName)
     {
         std::ofstream file;
@@ -452,7 +445,7 @@ public:
     }
 };
 template<typename T>
-Mat<T> for_each(const Mat<T>& x, double (*func)(double x))
+Mat<T> for_each(const Mat<T>& x, double (*func)(double))
 {
     Mat<T> y(x.rows, x.cols);
     for (int i = 0; i < x.rows; i++) {
@@ -502,12 +495,30 @@ T min(Mat<T>& x)
     }
     return minT;
 }
+template <typename T>
+Mat<T> Kronecker(const Mat<T> &x1, const Mat<T> &x2)
+{
+    int rows = x1.rows * x2.rows;
+    int cols = x1.cols * x2.cols;
+    Mat<T> y(rows, cols);
+    for (int i = 0; i < x1.rows; i++) {
+        for (int j = 0; j < x1.cols; j++) {
+            for (int h = 0; h < x2.rows; h++) {
+                for (int k = 0; k < x2.cols; k++) {
+                    y.data[i * x2.rows + h][j * x2.cols + k] = x1.data[i][j] * x2.data[h][k];
+                }
+            }
+        }
+    }
+    return y;
+}
 inline double sigmoid(double x){return exp(x) / (exp(x) + 1);}
 inline double relu(double x){return x > 0 ? x : 0;}
 inline double linear(double x){return x;}
 inline double dsigmoid(double y){return y * (1 - y);}
 inline double drelu(double y){return y > 0 ? 1 : 0;}
 inline double dtanh(double y){return 1 - y * y;}
+inline double dlinear(double){return 1;}
 template <typename T>
 Mat<T> LOG(const Mat<T> &x){return for_each(x, log);}
 template <typename T>

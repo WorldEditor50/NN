@@ -180,7 +180,7 @@ public:
     void forward(const SequenceIO &seq)
     {
         for (auto& x : seq) {
-            cell.forward(x);
+            cell.forward(x, cell.h, cell.s);
         }
         return;
     }

@@ -60,7 +60,10 @@ public:
 public:
     Graph(){}
     ~Graph(){}
-    Graph(const Graph<T> &graph)
+    inline bool isDAG(){return (vertexs.size() == topologySequence.size());}
+    inline bool isEmpty(){return vertexs.size() < 2;}
+    inline T& getObject(int index){return vertexs.at(index).object;}
+    void copy(const Graph<T> &graph)
     {
         vertexs = graph.vertexs;
         edges = graph.edges;
@@ -68,6 +71,10 @@ public:
         traversalSequence = graph.traversalSequence;
         previous = graph.previous;
         nexts = graph.nexts;
+    }
+    Graph(const Graph<T> &graph)
+    {
+        copy(graph);
     }
 
     Graph<T>& operator = (const Graph<T> &graph)
@@ -75,16 +82,9 @@ public:
         if (this == &graph) {
             return *this;
         }
-        vertexs = graph.vertexs;
-        edges = graph.edges;
-        topologySequence = graph.topologySequence;
-        traversalSequence = graph.traversalSequence;
-        previous = graph.previous;
-        nexts = graph.nexts;
+        copy(graph);
         return *this;
     }
-
-    inline bool isDAG(){return (vertexs.size() == topologySequence.size());}
 
     int findVertex(const std::string &name)
     {
@@ -138,15 +138,6 @@ public:
         return;
     }
 
-    inline bool isEmpty()
-    {
-        return vertexs.size() < 2;
-    }
-
-    inline T& getObject(int index)
-    {
-        return vertexs.at(index).object;
-    }
     std::vector<int> findNext(int index)
     {
         std::vector<int> nextIndex;

@@ -60,8 +60,8 @@ public:
     Mat<T> Sb;
     Mat<T> Vb;
     Mat<T> E;
-    double alpha1;
-    double alpha2;
+    T alpha1;
+    T alpha2;
 public:
      OptParam():alpha1(1), alpha2(1){}
      void copyFrom(const OptParam &param)
@@ -107,6 +107,7 @@ class Layer:public std::conditional<onTrain, OptParam<T>, OptNull<T> >::type
 {
 public:
     using TOpt = typename std::conditional<onTrain, OptParam<T>, OptNull<T> >::type;
+    typedef double (*FuncType)(double);
 public:
     std::map<int, Mat<T> > W;
     Mat<T> B;
@@ -117,6 +118,8 @@ public:
     ActiveType activeType;
     LossType lossType;
     LayerType layerType;
+    static FuncType ActiveFunc[4];
+    static FuncType dActiveFunc[4];
 public:
     Layer():layerDim(0), inputDim(0){}
     virtual ~Layer(){}
@@ -181,53 +184,24 @@ public:
         W[from] = Mat<T>(layerDim, inputDim, UNIFORM_RAND);
         return TOpt::connect(from, layerDim, inputDim);
     }
+
     Mat<T> Activate(const Mat<T> &x)
     {
-        Mat<T> y;
-        switch (activeType) {
-            case ACTIVE_SIGMOID:
-                y = for_each(x, sigmoid);
-                break;
-            case ACTIVE_RELU:
-                y = for_each(x, relu);
-                break;
-            case ACTIVE_TANH:
-                y = for_each(x, tanh);
-                break;
-            case ACTIVE_LINEAR:
-                y = x;
-                break;
-            default:
-                y = for_each(x, sigmoid);
-                break;
-        }
-        return y;
+        return for_each(x, ActiveFunc[activeType]);
     }
 
-    Mat<T> dActivate(const Mat<T>& y)
+    Mat<T> dActivate(const Mat<T> &x)
     {
-        Mat<T> dy;
-        switch (activeType) {
-            case ACTIVE_SIGMOID:
-                dy = for_each(y, dsigmoid);
-                break;
-            case ACTIVE_RELU:
-                dy = for_each(y, drelu);
-                break;
-            case ACTIVE_TANH:
-                dy = for_each(y, dtanh);
-                break;
-            case ACTIVE_LINEAR:
-                dy = y;
-                dy.assign(1);
-                break;
-            default:
-                dy = for_each(y, dsigmoid);
-                break;
-        }
-        return dy;
+        return for_each(x, dActiveFunc[activeType]);
     }
 };
+
+template <typename T, bool onTrain>
+typename Layer<T, onTrain>::FuncType Layer<T, onTrain>::ActiveFunc[4] = {sigmoid, tanh, relu, linear};
+
+template <typename T, bool onTrain>
+typename Layer<T, onTrain>::FuncType Layer<T, onTrain>::dActiveFunc[4] = {dsigmoid, dtanh, drelu, dlinear};
+
 
 template <typename T, bool onTrain = true>
 class MLP : public Graph<Layer<T, onTrain> >
@@ -242,6 +216,14 @@ public:
 public:
     MLP(){}
     ~MLP(){}
+    MLP& operator = (const MLP& mlp)
+    {
+        if (this == &mlp) {
+            return *this;
+        }
+        DAG::copy(mlp);
+        return *this;
+    }
     void addLayer(const Layer<T, onTrain> &layer, const std::string &layerName)
     {
         return DAG::insertVertex(layer, layerName);
@@ -280,7 +262,39 @@ public:
         return DAG::insertEdge(from, to);
     }
 
-    void copyTo(MLP& dst)
+    MLP<T, false> clone()
+    {
+        MLP<T, false> dst;
+        /* copy vertexs */
+        for (auto& x : DAG::vertexs) {
+            auto& layer = x.object;
+            if (layer.layerType == INPUT) {
+                dst.addLayer(layer.layerType, layer.activeType, layer.lossType, layer.layerDim, layer.inputDim, x.name);
+            } else {
+                dst.addLayer(layer.layerType, layer.activeType, layer.lossType, layer.layerDim ,x.name);
+            }
+        }
+        /* copy edges */
+        for (int current : DAG::topologySequence) {
+            auto &layer = dst.getObject(current);
+            if (layer.layerType != INPUT) {
+                for (int  from : DAG::previous.at(current)) {
+                    auto &preLayer = DAG::getObject(from);
+                    layer.connect(from, preLayer.layerDim);
+                }
+            }
+        }
+        dst.edges = DAG::edges;
+        dst.topologySequence = DAG::topologySequence;
+        dst.traversalSequence = DAG::traversalSequence;
+        dst.previous = DAG::previous;
+        dst.nexts = DAG::nexts;
+        /* copy data */
+        copyTo(dst);
+        return dst;
+    }
+
+    void copyTo(MLP<T, false>& dst)
     {
         for (int i = 0; i < DAG::vertexs.size(); i++) {
             dst.vertexs[i].object.W = DAG::vertexs[i].object.W;
@@ -289,7 +303,7 @@ public:
         return;
     }
 
-    void softUpdateTo(MLP &dst, double alpha)
+    void softUpdateTo(MLP<T, false>& dst, double alpha)
     {
         for (int  current : DAG::topologySequence) {
             auto &layer = DAG::getObject(current);
@@ -360,7 +374,7 @@ public:
                 layer.dB += dy;
             } else if (layer.lossType == MSE) {
                 Mat<T> dy = layer.E % layer.dActivate(layer.O);
-                if (DAG::vertexs.at(current).indegree == 0) {
+                if (layer.layerType == INPUT) {
                     layer.dW[0] += dy * x[DAG::vertexs[current].name].Tr();
                 } else {
                     for (int from : DAG::previous.at(current)) {
