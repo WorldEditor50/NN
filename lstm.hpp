@@ -3,11 +3,11 @@
 #include "matrix.hpp"
 using namespace ML;
 
-template <int cellDim, int inputDim, int outputDim>
-class Cell
+namespace lstm {
+
+template <typename DataType, int inputDim, int hiddenDim, int outputDim>
+class CellParam
 {
-public:
-    using DataType = double;
 public:
     /* forget gate */
     Mat<DataType> Wf;
@@ -24,23 +24,67 @@ public:
     Mat<DataType> Wo;
     Mat<DataType> Uo;
     Mat<DataType> Bo;
-    /* buffer */
-    /* forget gate */
-    Mat<DataType> dWf;
-    Mat<DataType> dUf;
-    Mat<DataType> dBf;
-    /* input gate */
-    Mat<DataType> dWi;
-    Mat<DataType> dUi;
-    Mat<DataType> dBi;
-    Mat<DataType> dWa;
-    Mat<DataType> dUa;
-    Mat<DataType> dBa;
-    /* output gate */
-    Mat<DataType> dWo;
-    Mat<DataType> dUo;
-    Mat<DataType> dBo;
-    /* cell state */
+    /* output */
+    Mat<DataType> Wp;
+    Mat<DataType> Bp;
+public:
+    CellParam()
+    {
+        /* forget gate */
+        Wf = Mat<DataType>(hiddenDim, inputDim);
+        Uf = Mat<DataType>(hiddenDim, hiddenDim);
+        Bf = Mat<DataType>(hiddenDim, 1);
+        /* input gate */
+        Wi = Mat<DataType>(hiddenDim, inputDim);
+        Ui = Mat<DataType>(hiddenDim, hiddenDim);
+        Bi = Mat<DataType>(hiddenDim, 1);
+        Wa = Mat<DataType>(hiddenDim, inputDim);
+        Ua = Mat<DataType>(hiddenDim, hiddenDim);
+        Ba = Mat<DataType>(hiddenDim, 1);
+        /* output gate */
+        Wo = Mat<DataType>(hiddenDim, inputDim);
+        Uo = Mat<DataType>(hiddenDim, hiddenDim);
+        Bo = Mat<DataType>(hiddenDim, 1);
+        /* output */
+        Wp = Mat<DataType>(outputDim, hiddenDim);
+        Bp = Mat<DataType>(outputDim, 1);
+    }
+    void zero()
+    {
+        Wf.zero();
+        Uf.zero();
+        Bf.zero();
+        Wi.zero();
+        Ui.zero();
+        Bi.zero();
+        Wa.zero();
+        Ua.zero();
+        Ba.zero();
+        Wo.zero();
+        Uo.zero();
+        Bo.zero();
+    }
+    void random()
+    {
+        Wf.uniformRandom();
+        Uf.uniformRandom();
+        Bf.uniformRandom();
+        Wi.uniformRandom();
+        Ui.uniformRandom();
+        Bi.uniformRandom();
+        Wa.uniformRandom();
+        Ua.uniformRandom();
+        Ba.uniformRandom();
+        Wo.uniformRandom();
+        Uo.uniformRandom();
+        Bo.uniformRandom();
+    }
+};
+
+template <typename DataType, int hiddenDim, int outputDim>
+class CellState
+{
+public:
     /* forget gate */
     Mat<DataType> f;
     /* input gate */
@@ -52,143 +96,205 @@ public:
     Mat<DataType> s;
     /* hiddien output */
     Mat<DataType> h;
-    /* gradient */
-    Mat<DataType> ds;
-    Mat<DataType> dh;
-    Mat<DataType> dx;
-    Mat<DataType> x;
-    /* predict */
-    Mat<DataType> yp;
-    Mat<DataType> Wp;
-    Mat<DataType> Bp;
+    /* output */
+    Mat<DataType> y;
 public:
-    Cell()
+    CellState()
     {
-        /* forget gate */
-        Wf = Mat<DataType>(cellDim, inputDim, UNIFORM_RAND);
-        Uf = Mat<DataType>(cellDim, outputDim, UNIFORM_RAND);
-        Bf = Mat<DataType>(cellDim, 1, UNIFORM_RAND);
-        /* input gate */
-        Wi = Mat<DataType>(cellDim, inputDim, UNIFORM_RAND);
-        Ui = Mat<DataType>(cellDim, outputDim, UNIFORM_RAND);
-        Bi = Mat<DataType>(cellDim, 1, UNIFORM_RAND);
-        Wa = Mat<DataType>(cellDim, inputDim, UNIFORM_RAND);
-        Ua = Mat<DataType>(cellDim, outputDim, UNIFORM_RAND);
-        Ba = Mat<DataType>(cellDim, 1, UNIFORM_RAND);
-        /* output gate */
-        Wo = Mat<DataType>(cellDim, inputDim, UNIFORM_RAND);
-        Uo = Mat<DataType>(cellDim, outputDim, UNIFORM_RAND);
-        Bo = Mat<DataType>(cellDim, 1, UNIFORM_RAND);
-        /* gradient */
-        /* forget gate */
-        dWf = Mat<DataType>(cellDim, inputDim);
-        dUf = Mat<DataType>(cellDim, outputDim);
-        dBf = Mat<DataType>(cellDim, 1);
-        /* input gate */
-        dWi = Mat<DataType>(cellDim, inputDim);
-        dUi = Mat<DataType>(cellDim, outputDim);
-        dBi = Mat<DataType>(cellDim, 1);
-        dWa = Mat<DataType>(cellDim, inputDim);
-        dUa = Mat<DataType>(cellDim, outputDim);
-        dBa = Mat<DataType>(cellDim, 1);
-        /* output gate */
-        dWo = Mat<DataType>(cellDim, inputDim);
-        dUo = Mat<DataType>(cellDim, outputDim);
-        dBo = Mat<DataType>(cellDim, 1);
-        /* cell state */
-        f = Mat<DataType>(cellDim, 1);
-        i = Mat<DataType>(cellDim, 1);
-        a = Mat<DataType>(cellDim, 1);
-        o = Mat<DataType>(cellDim, 1);
-        s = Mat<DataType>(cellDim, 1);
-        h = Mat<DataType>(cellDim, 1);
-        ds = Mat<DataType>(cellDim, 1);
-        dh = Mat<DataType>(cellDim, 1);
-        dx = Mat<DataType>(cellDim, 1);
-        /* predict */
-        yp = Mat<DataType>(cellDim, 1);
-        Wp = Mat<DataType>(cellDim, outputDim);
-        Bp = Mat<DataType>(cellDim, 1);
-    }
-    void zero()
-    {
-        dWf.zero();
-        dUf.zero();
-        dBf.zero();
-        dWi.zero();
-        dUi.zero();
-        dBi.zero();
-        dWa.zero();
-        dUa.zero();
-        dBa.zero();
-        dWo.zero();
-        dUo.zero();
-        dBo.zero();
+        f = Mat<DataType>(hiddenDim, 1);
+        i = Mat<DataType>(hiddenDim, 1);
+        a = Mat<DataType>(hiddenDim, 1);
+        o = Mat<DataType>(hiddenDim, 1);
+        s = Mat<DataType>(hiddenDim, 1);
+        h = Mat<DataType>(hiddenDim, 1);
+        y = Mat<DataType>(outputDim, 1);
     }
 
-    void SGD(double learningRate)
+    void copyFrom(const CellState &state)
     {
-        Wf -= dWf * learningRate;
-        Uf -= dUf * learningRate;
-        Bf -= dBf * learningRate;
-        Wi -= dWi * learningRate;
-        Ui -= dUi * learningRate;
-        Bi -= dBi * learningRate;
-        Wa -= dWa * learningRate;
-        Ua -= dUa * learningRate;
-        Ba -= dBa * learningRate;
-        Wo -= dWo * learningRate;
-        Uo -= dUo * learningRate;
-        Bo -= dBo * learningRate;
-        zero();
-        return;
-    }
-    void forward(const Mat<DataType> &x,
-                 const Mat<DataType> &h_,
-                 const Mat<DataType> &s_)
-    {
-        /* forget gate */
-        f = SIGMOID(Wf * x + Uf * h_ + Bf);
-        /* input gate */
-        i = SIGMOID(Wi * x + Ui * h_ + Bi);
-        a = TANH(Wa * x + Ua * h_ + Ba);
-        /* cell state */
-        s = f % s_ +  i % a;
-        /* output gate */
-        o = SIGMOID(Wo * x + Uo * h_ + Bo);
-        h = o % TANH(s);
-        /* predict */
-        yp = SOFTMAX(Wp * h + Bp);
+        f = state.f;
+        i = state.i;
+        a = state.a;
+        o = state.o;
+        s = state.s;
+        h = state.h;
+        y = state.y;
     }
 
-    void gradient(const Mat<DataType> &deltaH,
-                  const Mat<DataType> &deltaS)
+    CellState(const CellState &state)
     {
+        copyFrom(state);
+    }
 
+    CellState& operator = (const CellState &state)
+    {
+        if (this == &state) {
+            return *this;
+        }
+        copyFrom(state);
+        return *this;
     }
 };
 
-template <int cellDim, int inputDim, int outputDim>
+template <int inputDim, int hiddenDim, int outputDim>
 class LSTM
 {
 public:
-    using CELL = Cell<cellDim, inputDim, outputDim>;
-    using SequenceIO = std::vector<Mat<double> >;
-    CELL cell;
-    std::vector<CELL> buffer;
+    using DataType = double;
+    using Param = CellParam<DataType, inputDim, hiddenDim, outputDim>;
+    using State = CellState<DataType, hiddenDim, outputDim>;
+    using SequenceIO = std::vector<Mat<DataType> >;
 public:
+     Param param;
+     State state;
+     Param dParam;
+     Param Sp;
+     State delta;
+     State delta_future;
+     std::vector<State> states;
+public:
+    LSTM()
+    {
+        param.random();
+    }
+
+    Mat<DataType>& feedForward(const Mat<DataType> &x)
+    {
+        Mat<DataType> &h_ = state.h;
+        Mat<DataType> &s_ = state.s;
+        /* forget gate */
+        state.f = SIGMOID(param.Wf * x + param.Uf * h_ + param.Bf);
+        /* input gate */
+        state.i = SIGMOID(param.Wi * x + param.Ui * h_ + param.Bi);
+        state.a = TANH(param.Wa * x + param.Ua * h_ + param.Ba);
+        /* cell state */
+        state.s = state.f % s_ +  state.i % state.a;
+        /* output gate */
+        state.o = SIGMOID(param.Wo * x + param.Uo * h_ + param.Bo);
+        state.h = state.o % TANH(state.s);
+        /* predict */
+        state.y = SIGMOID(param.Wp * state.h + param.Bp);
+        return state.y;
+    }
+
     void forward(const SequenceIO &seq)
     {
-        for (auto& x : seq) {
-            cell.forward(x, cell.h, cell.s);
+        for (auto &x : seq) {
+            feedForward(x);
+            /* save state */
+            states.push_back(state);
         }
         return;
     }
 
-    void backward(const SequenceIO &x, const SequenceIO &y)
+    void gradient(SequenceIO &x, const SequenceIO &y)
     {
+        /* backward */
+        for (int i = states.size() - 2; i >= 0; i--) {
+            /* loss */
+            delta.y = states[i].y - y[i];
+            delta.h += param.Wp.Tr() * delta.y;
+            delta.h += param.Ui.Tr() * delta_future.i;
+            delta.h += param.Ua.Tr() * delta_future.a;
+            delta.h += param.Uf.Tr() * delta_future.f;
+            delta.h += param.Uo.Tr() * delta_future.o;
+
+            delta.o = delta.h % TANH(states[i + 1].s) % DSIGMOID(states[i].o);
+            delta.s = delta.h % states[i].o % DTANH(states[i + 1].s) +
+                    delta_future.s % states[i + 1].f;
+            delta.f = delta.s % states[i].s % DSIGMOID(states[i].f);
+            delta.i = delta.s % states[i].a % DSIGMOID(states[i].i);
+            delta.a = delta.s % states[i].i % DSIGMOID(states[i].a);
+
+            /* gradient */
+            dParam.Wi += delta.i * x[i].Tr();
+            dParam.Wa += delta.a * x[i].Tr();
+            dParam.Wf += delta.f * x[i].Tr();
+            dParam.Wo += delta.o * x[i].Tr();
+
+            dParam.Ui += delta.i * states[i].h.Tr();
+            dParam.Ua += delta.a * states[i].h.Tr();
+            dParam.Uf += delta.f * states[i].h.Tr();
+            dParam.Uo += delta.o * states[i].h.Tr();
+
+            dParam.Bi += delta.i;
+            dParam.Ba += delta.a;
+            dParam.Bf += delta.f;
+            dParam.Bo += delta.o;
+
+            dParam.Wp += delta.y % DSIGMOID(states[i].y) * states[i + 1].h.Tr();
+            dParam.Bp += delta.y % DSIGMOID(states[i].y);
+            /* save */
+            delta_future = delta;
+        }
+        states.clear();
+        return;
+    }
+
+    void SGD(double learningRate)
+    {
+        param.Wf -= dParam.Wf * learningRate;
+        param.Uf -= dParam.Uf * learningRate;
+        param.Bf -= dParam.Bf * learningRate;
+
+        param.Wi -= dParam.Wi * learningRate;
+        param.Ui -= dParam.Ui * learningRate;
+        param.Bi -= dParam.Bi * learningRate;
+
+        param.Wa -= dParam.Wa * learningRate;
+        param.Ua -= dParam.Ua * learningRate;
+        param.Ba -= dParam.Ba * learningRate;
+
+        param.Wo -= dParam.Wo * learningRate;
+        param.Uo -= dParam.Uo * learningRate;
+        param.Bo -= dParam.Bo * learningRate;
+
+        param.Wp -= dParam.Wp * learningRate;
+        param.Bp -= dParam.Bp * learningRate;
+        dParam.zero();
+        return;
+    }
+
+    void RMSProp(double rho, double learningRate)
+    {
+        Sp.Wi = Sp.Wi * rho + (dParam.Wi % dParam.Wi) * (1 - rho);
+        Sp.Wa = Sp.Wa * rho + (dParam.Wa % dParam.Wa) * (1 - rho);
+        Sp.Wf = Sp.Wf * rho + (dParam.Wf % dParam.Wf) * (1 - rho);
+        Sp.Wo = Sp.Wo * rho + (dParam.Wo % dParam.Wo) * (1 - rho);
+        Sp.Wp = Sp.Wp * rho + (dParam.Wp % dParam.Wp) * (1 - rho);
+
+        Sp.Ui = Sp.Ui * rho + (dParam.Ui % dParam.Ui) * (1 - rho);
+        Sp.Ua = Sp.Ua * rho + (dParam.Ua % dParam.Ua) * (1 - rho);
+        Sp.Uf = Sp.Uf * rho + (dParam.Uf % dParam.Uf) * (1 - rho);
+        Sp.Uo = Sp.Uo * rho + (dParam.Uo % dParam.Uo) * (1 - rho);
+
+        Sp.Bi = Sp.Bi * rho + (dParam.Bi % dParam.Bi) * (1 - rho);
+        Sp.Ba = Sp.Ba * rho + (dParam.Ba % dParam.Ba) * (1 - rho);
+        Sp.Bf = Sp.Bf * rho + (dParam.Bf % dParam.Bf) * (1 - rho);
+        Sp.Bo = Sp.Bo * rho + (dParam.Bo % dParam.Bo) * (1 - rho);
+        Sp.Bp = Sp.Bp * rho + (dParam.Bp % dParam.Bp) * (1 - rho);
+
+        param.Wi -= dParam.Wi / (SQRT(Sp.Wi) + 1e-9) * learningRate;
+        param.Wa -= dParam.Wa / (SQRT(Sp.Wa) + 1e-9) * learningRate;
+        param.Wf -= dParam.Wf / (SQRT(Sp.Wf) + 1e-9) * learningRate;
+        param.Wo -= dParam.Wo / (SQRT(Sp.Wo) + 1e-9) * learningRate;
+        param.Wp -= dParam.Wp / (SQRT(Sp.Wp) + 1e-9) * learningRate;
+
+        param.Ui -= dParam.Ui / (SQRT(Sp.Ui) + 1e-9) * learningRate;
+        param.Ua -= dParam.Ua / (SQRT(Sp.Ua) + 1e-9) * learningRate;
+        param.Uf -= dParam.Uf / (SQRT(Sp.Uf) + 1e-9) * learningRate;
+        param.Uo -= dParam.Uo / (SQRT(Sp.Uo) + 1e-9) * learningRate;
+
+        param.Bi -= dParam.Bi / (SQRT(Sp.Bi) + 1e-9) * learningRate;
+        param.Ba -= dParam.Ba / (SQRT(Sp.Ba) + 1e-9) * learningRate;
+        param.Bf -= dParam.Bf / (SQRT(Sp.Bf) + 1e-9) * learningRate;
+        param.Bo -= dParam.Bo / (SQRT(Sp.Bo) + 1e-9) * learningRate;
+        param.Bp -= dParam.Bp / (SQRT(Sp.Bp) + 1e-9) * learningRate;
+
+        dParam.zero();
         return;
     }
 };
 
+}
 #endif // LSTM_HPP

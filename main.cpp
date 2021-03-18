@@ -1,4 +1,6 @@
 #include "mlp.hpp"
+#include "lstm.hpp"
+using namespace lstm;
 
 void test_DAG()
 {
@@ -133,6 +135,12 @@ void test_xor()
         predictNet.feedForward(x[i]);
         predictNet.show();
     }
+    return;
+}
+
+void test_lstm()
+{
+    LSTM<16, 32, 8> guess;
     return;
 }
 
