@@ -182,6 +182,8 @@ public:
     {
         if (!isSizeEqual(x)) {
             std::cout<<"- size is not matched"<<std::endl;
+            std::cout<<"this row:"<<rows<<"  x row:"<<x.rows<<std::endl;
+            std::cout<<"this col:"<<cols<<"  x col:"<<x.cols<<std::endl;
             return *this;
         }
         Mat<T> y(rows, cols);
@@ -445,7 +447,7 @@ public:
     }
 };
 template<typename T>
-Mat<T> for_each(const Mat<T>& x, double (*func)(double))
+Mat<T> for_each(const Mat<T>& x, std::function<double(double)> func)
 {
     Mat<T> y(x.rows, x.cols);
     for (int i = 0; i < x.rows; i++) {
@@ -525,22 +527,32 @@ template <typename T>
 Mat<T> EXP(const Mat<T> &x){return for_each(x, exp);}
 template <typename T>
 Mat<T> SQRT(const Mat<T> &x){return for_each(x, sqrt);}
+
 template <typename T>
-Mat<T> RELU(const Mat<T> &x){return for_each(x, relu);}
+class Sigmoid {
+public:
+    static Mat<T> _(const Mat<T> &x){return for_each(x, sigmoid);}
+    static Mat<T> d(const Mat<T> &y){return for_each(y, dsigmoid);}
+};
 template <typename T>
-Mat<T> LINEAR(const Mat<T> &x){return x;}
+class Relu {
+public:
+    static Mat<T> _(const Mat<T> &x){return for_each(x, relu);}
+    static Mat<T> d(const Mat<T> &y){return for_each(y, drelu);}
+};
 template <typename T>
-Mat<T> TANH(const Mat<T> &x){return for_each(x, tanh);}
+class Tanh {
+public:
+    static Mat<T> _(const Mat<T> &x){return for_each(x, tanh);}
+    static Mat<T> d(const Mat<T> &y){return for_each(y, dtanh);}
+};
 template <typename T>
-Mat<T> SIGMOID(const Mat<T> &x){return for_each(x, sigmoid);}
-template <typename T>
-Mat<T> DRELU(const Mat<T> &x){return for_each(x, drelu);}
-template <typename T>
-Mat<T> DTANH(const Mat<T> &y){return for_each(y, dtanh);}
-template <typename T>
-Mat<T> DSIGMOID(const Mat<T> &y){return for_each(y, dsigmoid);}
-template <typename T>
-Mat<T> DLINEAR(const Mat<T> &x){ Mat<T> y(x); y.assign(1);return y;}
+class Linear {
+public:
+    static Mat<T> _(const Mat<T> &x){return x;}
+    static Mat<T> d(const Mat<T> &x){Mat<T> y(x); y.assign(1); return y;}
+};
+
 template <typename T>
 Mat<T> SOFTMAX(Mat<T>& x)
 {

@@ -5,17 +5,17 @@ using namespace lstm;
 void test_DAG()
 {
     std::cout<<"mlp"<<std::endl;
-    MLP<double> mlp;
+    MLP<double, Sigmoid> mlp;
     /* add layer */
     std::cout<<"add layer"<<std::endl;
-    mlp.addLayer(INPUT, ACTIVE_SIGMOID, MSE, 4, 4, "input1");
-    mlp.addLayer(INPUT, ACTIVE_SIGMOID, MSE, 4, 4, "input2");
-    mlp.addLayer(INPUT, ACTIVE_SIGMOID, MSE, 4, 4, "input3");
-    mlp.addLayer(INPUT, ACTIVE_SIGMOID, MSE, 4, 4, "input4");
-    mlp.addLayer(HIDDEN, ACTIVE_SIGMOID, MSE, 8, "hidden1");
-    mlp.addLayer(HIDDEN, ACTIVE_SIGMOID, MSE, 8, "hidden2");
-    mlp.addLayer(HIDDEN, ACTIVE_SIGMOID, MSE, 8, "hidden3");
-    mlp.addLayer(OUTPUT, ACTIVE_SIGMOID, MSE, 4, "output");
+    mlp.addLayer(INPUT, MSE, 4, 4, "input1");
+    mlp.addLayer(INPUT, MSE, 4, 4, "input2");
+    mlp.addLayer(INPUT, MSE, 4, 4, "input3");
+    mlp.addLayer(INPUT, MSE, 4, 4, "input4");
+    mlp.addLayer(HIDDEN, MSE, 8, "hidden1");
+    mlp.addLayer(HIDDEN, MSE, 8, "hidden2");
+    mlp.addLayer(HIDDEN, MSE, 8, "hidden3");
+    mlp.addLayer(OUTPUT, MSE, 4, "output");
     /* connection */
     std::cout<<"connect"<<std::endl;
     mlp.connectLayer("input1", "hidden1");
@@ -37,7 +37,7 @@ void test_DAG()
 
     /* feed forward */
     std::cout<<"feed forward"<<std::endl;
-    MLP<double>::Input x;
+    MLP<double,Sigmoid>::Input x;
     x["input1"] = Mat<double>(4, 1);
     x["input2"] = Mat<double>(4, 1);
     x["input3"] = Mat<double>(4, 1);
@@ -69,14 +69,14 @@ void test_xor()
                   +-->-hidden2-->--+
     */
     std::cout<<"mlp"<<std::endl;
-    using BPNN = MLP<double, true>;
+    using BPNN = MLP<double, Relu, true>;
     BPNN bp;
     /* add layer */
     std::cout<<"add layer"<<std::endl;
-    bp.addLayer(INPUT, ACTIVE_RELU, MSE, 4, 2, "input");
-    bp.addLayer(HIDDEN, ACTIVE_RELU, MSE, 4, "hidden1");
-    bp.addLayer(HIDDEN, ACTIVE_RELU, MSE, 4, "hidden2");
-    bp.addLayer(OUTPUT, ACTIVE_RELU, MSE, 1, "output");
+    bp.addLayer(INPUT, MSE, 4, 2, "input");
+    bp.addLayer(HIDDEN, MSE, 4, "hidden1");
+    bp.addLayer(HIDDEN, MSE, 4, "hidden2");
+    bp.addLayer(OUTPUT, MSE, 1, "output");
     /* connect */
     std::cout<<"connect"<<std::endl;
     bp.connectLayer("input", "hidden1");
@@ -119,7 +119,7 @@ void test_xor()
             bp.feedForward(x[k]);
             bp.gradient(x[k], y[k]);
         }
-        bp.SGD(0.01);
+        bp.RMSProp(0.9, 0.0001);
     }
     /* classify */
     std::cout<<"classify"<<std::endl;
@@ -129,7 +129,7 @@ void test_xor()
     }
     /* clone */
     std::cout<<"clone:"<<std::endl;
-    MLP<double, false> predictNet = bp.clone();
+    MLP<double, Relu, false> predictNet = bp.clone();
     predictNet.showTopology();
     for (int i = 0; i < 4; i++) {
         predictNet.feedForward(x[i]);
@@ -138,9 +138,55 @@ void test_xor()
     return;
 }
 
+std::vector<Mat<double> > int2Sequence(int x1, int x2)
+{
+    std::vector<Mat<double> > seq;
+    for (int i = 0; i < 16; i++) {
+        seq.push_back(Mat<double>(1, 1));
+    }
+    for (int i = 0; i < 8; i++) {
+        seq[i][0][0] = 0x01 & x1;
+        x1 >>= 1;
+    }
+    for (int i = 8; i < 16; i++) {
+        seq[i][0][0] = 0x01 & x2;
+        x2 >>= 1;
+    }
+    return seq;
+}
+
+std::vector<Mat<double> > int2Sequence(int x)
+{
+    std::vector<Mat<double> > seq;
+    for (int i = 0; i < 8; i++) {
+        seq.push_back(Mat<double>(1, 1));
+    }
+    for (int i = 0; i < 8; i++) {
+        seq[i][0][0] = 0x01 & x;
+        x >>= 1;
+    }
+    return seq;
+}
+
 void test_lstm()
 {
-    LSTM<16, 32, 8> guess;
+    LSTM<1, 8, 1> guess;
+    for (int epoch = 0; epoch < 10; epoch++) {
+        int a = rand() % 128;
+        int b = rand() % 128;
+        int c = a + b;
+        std::vector<Mat<double> > seq = int2Sequence(a, b);
+        std::vector<Mat<double> > y = int2Sequence(c);
+        guess.forward(seq);
+        guess.gradient(seq, y);
+        guess.SGD(0.01);
+        int d = 0;
+        for (auto &p : guess.states) {
+            d += p.y[0][0];
+        }
+        std::cout<<a<<" + "<<b<<" = "<<d<<std::endl;
+        guess.states.clear();
+    }
     return;
 }
 

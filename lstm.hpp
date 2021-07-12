@@ -163,17 +163,17 @@ public:
         Mat<DataType> &h_ = state.h;
         Mat<DataType> &s_ = state.s;
         /* forget gate */
-        state.f = SIGMOID(param.Wf * x + param.Uf * h_ + param.Bf);
+        state.f = Sigmoid<DataType>::_(param.Wf * x + param.Uf * h_ + param.Bf);
         /* input gate */
-        state.i = SIGMOID(param.Wi * x + param.Ui * h_ + param.Bi);
-        state.a = TANH(param.Wa * x + param.Ua * h_ + param.Ba);
+        state.i = Sigmoid<DataType>::_(param.Wi * x + param.Ui * h_ + param.Bi);
+        state.a = Tanh<DataType>::_(param.Wa * x + param.Ua * h_ + param.Ba);
         /* cell state */
         state.s = state.f % s_ +  state.i % state.a;
         /* output gate */
-        state.o = SIGMOID(param.Wo * x + param.Uo * h_ + param.Bo);
-        state.h = state.o % TANH(state.s);
+        state.o = Sigmoid<DataType>::_(param.Wo * x + param.Uo * h_ + param.Bo);
+        state.h = state.o % Tanh<DataType>::_(state.s);
         /* predict */
-        state.y = SIGMOID(param.Wp * state.h + param.Bp);
+        state.y = Sigmoid<DataType>::_(param.Wp * state.h + param.Bp);
         return state.y;
     }
 
@@ -199,12 +199,12 @@ public:
             delta.h += param.Uf.Tr() * delta_future.f;
             delta.h += param.Uo.Tr() * delta_future.o;
 
-            delta.o = delta.h % TANH(states[i + 1].s) % DSIGMOID(states[i].o);
-            delta.s = delta.h % states[i].o % DTANH(states[i + 1].s) +
+            delta.o = delta.h % Tanh<DataType>::_(states[i + 1].s) % Sigmoid<DataType>::d(states[i].o);
+            delta.s = delta.h % states[i].o % Tanh<DataType>::d(states[i + 1].s) +
                     delta_future.s % states[i + 1].f;
-            delta.f = delta.s % states[i].s % DSIGMOID(states[i].f);
-            delta.i = delta.s % states[i].a % DSIGMOID(states[i].i);
-            delta.a = delta.s % states[i].i % DSIGMOID(states[i].a);
+            delta.f = delta.s % states[i].s % Sigmoid<DataType>::d(states[i].f);
+            delta.i = delta.s % states[i].a % Sigmoid<DataType>::d(states[i].i);
+            delta.a = delta.s % states[i].i % Sigmoid<DataType>::d(states[i].a);
 
             /* gradient */
             dParam.Wi += delta.i * x[i].Tr();
@@ -222,8 +222,8 @@ public:
             dParam.Bf += delta.f;
             dParam.Bo += delta.o;
 
-            dParam.Wp += delta.y % DSIGMOID(states[i].y) * states[i + 1].h.Tr();
-            dParam.Bp += delta.y % DSIGMOID(states[i].y);
+            dParam.Wp += delta.y % Sigmoid<DataType>::d(states[i].y) * states[i + 1].h.Tr();
+            dParam.Bp += delta.y % Sigmoid<DataType>::d(states[i].y);
             /* save */
             delta_future = delta;
         }

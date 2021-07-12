@@ -31,13 +31,6 @@ enum LayerType {
   HIDDEN,
   OUTPUT
 };
-/* activate method */
-enum ActiveType {
-    ACTIVE_SIGMOID = 0,
-    ACTIVE_TANH,
-    ACTIVE_RELU,
-    ACTIVE_LINEAR
-};
 
 template <typename T>
 class OptNull
@@ -115,7 +108,6 @@ public:
     /* paramter */
     int layerDim;
     int inputDim;
-    ActiveType activeType;
     LossType lossType;
     LayerType layerType;
     static FuncType ActiveFunc[4];
@@ -131,7 +123,6 @@ public:
         /* paramter */
         layerDim = layer.layerDim;
         inputDim = layer.inputDim;
-        activeType = layer.activeType;
         lossType = layer.lossType;
         layerType = layer.layerType;
         return TOpt::copyFrom(layer);
@@ -149,13 +140,11 @@ public:
         return *this;
     }
     Layer(LayerType layerType,
-          ActiveType activeType,
           LossType lossType,
           int layerDim)
     {
         this->layerDim = layerDim;
         this->lossType = lossType;
-        this->activeType = activeType;
         this->layerType = layerType;
         B = Mat<T>(layerDim, 1, UNIFORM_RAND);
         O = Mat<T>(layerDim, 1);
@@ -163,7 +152,6 @@ public:
     }
 
     Layer(LayerType layerType,
-          ActiveType activeType,
           LossType lossType,
           int layerDim,
           int inputDim)
@@ -171,7 +159,6 @@ public:
         this->layerDim = layerDim;
         this->inputDim = inputDim;
         this->lossType = lossType;
-        this->activeType = activeType;
         this->layerType = layerType;
         W[0] = Mat<T>(layerDim, inputDim, UNIFORM_RAND);
         B = Mat<T>(layerDim, 1, UNIFORM_RAND);
@@ -184,26 +171,9 @@ public:
         W[from] = Mat<T>(layerDim, inputDim, UNIFORM_RAND);
         return TOpt::connect(from, layerDim, inputDim);
     }
-
-    Mat<T> Activate(const Mat<T> &x)
-    {
-        return for_each(x, ActiveFunc[activeType]);
-    }
-
-    Mat<T> dActivate(const Mat<T> &x)
-    {
-        return for_each(x, dActiveFunc[activeType]);
-    }
 };
 
-template <typename T, bool onTrain>
-typename Layer<T, onTrain>::FuncType Layer<T, onTrain>::ActiveFunc[4] = {sigmoid, tanh, relu, linear};
-
-template <typename T, bool onTrain>
-typename Layer<T, onTrain>::FuncType Layer<T, onTrain>::dActiveFunc[4] = {dsigmoid, dtanh, drelu, dlinear};
-
-
-template <typename T, bool onTrain = true>
+template <typename T, template<typename> class ActivateF, bool onTrain = true>
 class MLP : public Graph<Layer<T, onTrain> >
 {
 public:
@@ -230,22 +200,20 @@ public:
     }
 
     void addLayer(LayerType layerType,
-                  ActiveType activeType,
                   LossType lossType,
                   int layerDim,
                   const std::string &layerName)
     {
-        return DAG::insertVertex(Layer<T, onTrain>(layerType, activeType, lossType, layerDim), layerName);
+        return DAG::insertVertex(Layer<T, onTrain>(layerType, lossType, layerDim), layerName);
     }
 
     void addLayer(LayerType layerType,
-                  ActiveType activeType,
                   LossType lossType,
                   int layerDim,
                   int inputDim,
                   const std::string &layerName)
     {
-        return DAG::insertVertex(Layer<T, onTrain>(layerType, activeType, lossType, layerDim, inputDim), layerName);
+        return DAG::insertVertex(Layer<T, onTrain>(layerType, lossType, layerDim, inputDim), layerName);
     }
 
     void connectLayer(const std::string &fromName, const std::string &toName)
@@ -262,16 +230,16 @@ public:
         return DAG::insertEdge(from, to);
     }
 
-    MLP<T, false> clone()
+    MLP<T, ActivateF, false> clone()
     {
-        MLP<T, false> dst;
+        MLP<T, ActivateF, false> dst;
         /* copy vertexs */
         for (auto& x : DAG::vertexs) {
             auto& layer = x.object;
             if (layer.layerType == INPUT) {
-                dst.addLayer(layer.layerType, layer.activeType, layer.lossType, layer.layerDim, layer.inputDim, x.name);
+                dst.addLayer(layer.layerType, layer.lossType, layer.layerDim, layer.inputDim, x.name);
             } else {
-                dst.addLayer(layer.layerType, layer.activeType, layer.lossType, layer.layerDim ,x.name);
+                dst.addLayer(layer.layerType, layer.lossType, layer.layerDim ,x.name);
             }
         }
         /* copy edges */
@@ -294,7 +262,7 @@ public:
         return dst;
     }
 
-    void copyTo(MLP<T, false>& dst)
+    void copyTo(MLP<T, ActivateF, false>& dst)
     {
         for (int i = 0; i < DAG::vertexs.size(); i++) {
             dst.vertexs[i].object.W = DAG::vertexs[i].object.W;
@@ -303,7 +271,7 @@ public:
         return;
     }
 
-    void softUpdateTo(MLP<T, false>& dst, double alpha)
+    void softUpdateTo(MLP<T, ActivateF, false>& dst, double alpha)
     {
         for (int  current : DAG::topologySequence) {
             auto &layer = DAG::getObject(current);
@@ -324,7 +292,7 @@ public:
         for (int current : DAG::topologySequence) {
             auto &layer = DAG::getObject(current);
             if (layer.layerType == INPUT) {
-                layer.O = layer.Activate(layer.W[0] * x.at(DAG::vertexs[current].name) + layer.B);
+                layer.O = ActivateF<T>::_(layer.W[0] * x.at(DAG::vertexs[current].name) + layer.B);
             } else {
                 Mat<T> s(layer.O.rows, layer.O.cols);
                 for (int from : DAG::previous[current]) {
@@ -332,7 +300,7 @@ public:
                     s += layer.W[from] * preLayer.O;
                 }
                 s += layer.B;
-                layer.O = layer.Activate(s);
+                layer.O = ActivateF<T>::_(s);
                 if (layer.lossType == CROSS_ENTROPY) {
                     layer.O = SOFTMAX(layer.O);
                 }
@@ -373,7 +341,7 @@ public:
                 layer.dW[0] += dy * layer.O.Tr();
                 layer.dB += dy;
             } else if (layer.lossType == MSE) {
-                Mat<T> dy = layer.E % layer.dActivate(layer.O);
+                Mat<T> dy = layer.E % ActivateF<T>::d(layer.O);
                 if (layer.layerType == INPUT) {
                     layer.dW[0] += dy * x[DAG::vertexs[current].name].Tr();
                 } else {
