@@ -26,10 +26,10 @@ public:
 public:
 	Mat():rows(0), cols(0){}
     ~Mat(){}
-    inline bool isSizeEqual(const Mat<T>& x){return (rows == x.rows && cols == x.cols);}
-    inline bool isNull(){return rows == 0 || cols == 0;}
-    inline bool isSquare(){return rows == cols;}
-    inline T& at(int row, int col){return data[row][col];}
+    inline bool isShapeEqual(const Mat<T>& x)const{return (rows == x.rows && cols == x.cols);}
+    inline bool isNull() const {return rows == 0 || cols == 0;}
+    inline bool isSquare()const {return rows == cols;}
+    inline T& at(int row, int col) {return data[row][col];}
     std::vector<T>& operator[](int i){return data[i];}
     Mat<T>& create(int rows, int cols)
     {
@@ -124,7 +124,7 @@ public:
         if (isNull()) {
             create(x.rows, x.cols);
         }
-        if (!isSizeEqual(x)) {
+        if (!isShapeEqual(x)) {
             std::cout<<"= size is not matched"<<std::endl;
             return *this;
         }
@@ -165,7 +165,7 @@ public:
 
     Mat<T> operator + (const Mat<T>& x)
     {
-        if (!isSizeEqual(x)) {
+        if (!isShapeEqual(x)) {
             std::cout<<"+ size is not matched"<<std::endl;
             return *this;
         }
@@ -180,7 +180,7 @@ public:
 
     Mat<T> operator - (const Mat<T>& x)
     {
-        if (!isSizeEqual(x)) {
+        if (!isShapeEqual(x)) {
             std::cout<<"- size is not matched"<<std::endl;
             std::cout<<"this row:"<<rows<<"  x row:"<<x.rows<<std::endl;
             std::cout<<"this col:"<<cols<<"  x col:"<<x.cols<<std::endl;
@@ -218,7 +218,7 @@ public:
 
     Mat<T> operator / (const Mat<T>& x)
     {
-        if (!isSizeEqual(x)) {
+        if (!isShapeEqual(x)) {
             std::cout<<"/ size is not matched"<<std::endl;
             return *this;
         }
@@ -233,7 +233,7 @@ public:
 
     Mat<T> operator % (const Mat<T>& x)
     {
-        if (!isSizeEqual(x)) {
+        if (!isShapeEqual(x)) {
             std::cout<<"% size is not matched"<<std::endl;
             return *this;
         }
@@ -248,7 +248,7 @@ public:
 
     Mat<T>& operator += (const Mat<T>& x)
     {
-        if (!isSizeEqual(x)) {
+        if (!isShapeEqual(x)) {
             std::cout<<"+= size is not matched"<<std::endl;
             return *this;
         }
@@ -262,7 +262,7 @@ public:
 
     Mat<T>& operator -= (const Mat<T>& x)
     {
-        if (!isSizeEqual(x)) {
+        if (!isShapeEqual(x)) {
             std::cout<<"-= size is not matched"<<std::endl;
             return *this;
         }
@@ -276,7 +276,7 @@ public:
 
     Mat<T>& operator /= (const Mat<T>& x)
     {
-        if (!isSizeEqual(x)) {
+        if (!isShapeEqual(x)) {
             std::cout<<"/= size is not matched"<<std::endl;
             return *this;
         }
@@ -290,7 +290,7 @@ public:
 
     Mat<T>& operator %= (const Mat<T>& x)
     {
-        if (!isSizeEqual(x)) {
+        if (!isShapeEqual(x)) {
             std::cout<<"%= size is not matched"<<std::endl;
             return *this;
         }

@@ -13,13 +13,6 @@
 #include "graph.hpp"
 using namespace ML;
 
-/* Optimize method */
-enum OptType {
-    OPT_NONE = 0,
-    OPT_SGD,
-    OPT_RMSPROP,
-    OPT_ADAM
-};
 /* loss type */
 enum LossType {
     MSE = 0,
@@ -33,74 +26,270 @@ enum LayerType {
 };
 
 template <typename T>
-class OptNull
+class NoneOpt
 {
 public:
-    OptNull(){}
-    void copyFrom(const OptNull &){}
-    void init(LayerType , int , int ){}
+    NoneOpt(){}
+    NoneOpt(const NoneOpt &){}
+    NoneOpt& operator=(const NoneOpt &){return *this;}
+    NoneOpt(LayerType , int , int ){}
     void connect(int , int , int){}
+    void _(const std::vector<int> &,
+           LayerType ,
+           double ,
+           std::map<int, Mat<T> > &,
+           Mat<T> &){}
 };
 
 template <typename T>
-class OptParam
+class SGD
 {
 public:
+   std::map<int, Mat<T> > dW;
+   Mat<T> dB;
+   Mat<T> E;
+public:
+    SGD(){}
+    SGD(const SGD &sgd)
+    {
+        dW = sgd.dW;
+        dB = sgd.dB;
+        E = sgd.E;
+        return;
+    }
+    SGD& operator = (const SGD &sgd)
+    {
+        if (this == &sgd) {
+            return *this;
+        }
+        dW = sgd.dW;
+        dB = sgd.dB;
+        E = sgd.E;
+        return *this;
+    }
+    SGD(LayerType layerType, int layerDim, int inputDim)
+    {
+        if (layerType == INPUT) {
+            dW[0] = Mat<T>(layerDim, inputDim);
+        }
+        E = Mat<T>(layerDim, 1);
+        dB = Mat<T>(layerDim, 1);
+    }
+    void connect(int from, int layerDim, int inputDim)
+    {
+        dW[from] = Mat<T>(layerDim, inputDim);
+        return;
+    }
+    void _(const std::vector<int> &previous,
+           LayerType layerType,
+           double learningRate,
+           std::map<int, Mat<T> > &W,
+           Mat<T> &B)
+    {
+        if (layerType == INPUT) {
+            W[0] -= dW[0] * learningRate;
+            dW[0].zero();
+        } else {
+            for (int from : previous) {
+                W[from] -= dW[from] * learningRate;
+                dW[from].zero();
+            }
+        }
+        B -= dB * learningRate;
+        dB.zero();
+        return;
+    }
+};
+
+template <typename T>
+class RMSProp
+{
+public:
+     static T rho;
+public:
     std::map<int, Mat<T> > dW;
-    std::map<int, Mat<T> > Sw;
-    std::map<int, Mat<T> > Vw;
     Mat<T> dB;
-    Mat<T> Sb;
-    Mat<T> Vb;
     Mat<T> E;
+    std::map<int, Mat<T> > Sw;
+    Mat<T> Sb;
+public:
+    RMSProp(){}
+    RMSProp(const RMSProp &rmsprop)
+    {
+        dW = rmsprop.dW;
+        dB = rmsprop.dB;
+        E = rmsprop.E;
+        Sw = rmsprop.Sw;
+        Sb = rmsprop.Sb;
+        rho = rmsprop.rho;
+        return;
+    }
+    RMSProp& operator=(const RMSProp &rmsprop)
+    {
+        if (this == &rmsprop) {
+            return *this;
+        }
+        dW = rmsprop.dW;
+        dB = rmsprop.dB;
+        E = rmsprop.E;
+        Sw = rmsprop.Sw;
+        Sb = rmsprop.Sb;
+        rho = rmsprop.rho;
+        return *this;
+    }
+    RMSProp(LayerType layerType, int layerDim, int inputDim)
+    {
+        if (layerType == INPUT) {
+            dW[0] = Mat<T>(layerDim, inputDim);
+            Sw[0] = Mat<T>(layerDim, inputDim);
+        }
+        E = Mat<T>(layerDim, 1);
+        dB = Mat<T>(layerDim, 1);
+        Sb = Mat<T>(layerDim, 1);
+        return;
+    }
+    void connect(int from, int layerDim, int inputDim)
+    {
+        dW[from] = Mat<T>(layerDim, inputDim);
+        Sw[from] = Mat<T>(layerDim, inputDim);
+        return;
+    }
+    void _(const std::vector<int> &previous,
+           LayerType layerType,
+           double learningRate,
+           std::map<int, Mat<T> > &W,
+           Mat<T> &B)
+    {
+        if (layerType == INPUT) {
+            Sw[0] = Sw[0] * rho + (dW[0] % dW[0]) * (1 - rho);
+            W[0] -= dW[0] / (SQRT(Sw[0]) + 1e-9) * learningRate;
+            dW[0].zero();
+        } else {
+            for (int from : previous) {
+                Sw[from] = Sw[from] * rho + (dW[from] % dW[from]) * (1 - rho);
+                W[from] -= dW[from] / (SQRT(Sw[from]) + 1e-9) * learningRate;
+                dW[from].zero();
+            }
+        }
+        Sb = Sb * rho + (dB % dB) * (1 - rho);
+        B -= dB / (SQRT(Sb) + 1e-9)* learningRate;
+        dB.zero();
+        return;
+    }
+};
+template<typename T>
+T RMSProp<T>::rho(0.9);
+
+template <typename T>
+class Adam
+{
+public:
+    static T alpha1Factor;
+    static T alpha2Factor;
+public:
+    std::map<int, Mat<T> > dW;
+    Mat<T> dB;
+    Mat<T> E;
+    std::map<int, Mat<T> > Sw;
+    Mat<T> Sb;
+    std::map<int, Mat<T> > Vw;
+    Mat<T> Vb;
     T alpha1;
     T alpha2;
 public:
-     OptParam():alpha1(1), alpha2(1){}
-     void copyFrom(const OptParam &param)
-     {
-         if (this == &param) {
-             return;
-         }
-         dW = param.dW;
-         Sw = param.Sw;
-         Vw = param.Vw;
-         dB = param.dB;
-         Sb = param.Sb;
-         Vb = param.Vb;
-         E = param.E;
-         alpha1 = param.alpha1;
-         alpha2 = param.alpha2;
-         return;
-     }
-     void init(LayerType layerType, int layerDim, int inputDim)
-     {
-         if (layerType == INPUT) {
-             dW[0] = Mat<T>(layerDim, inputDim);
-             Sw[0] = Mat<T>(layerDim, inputDim);
-             Vw[0] = Mat<T>(layerDim, inputDim);
-         }
-         E = Mat<T>(layerDim, 1);
-         dB = Mat<T>(layerDim, 1);
-         Sb = Mat<T>(layerDim, 1);
-         Vb = Mat<T>(layerDim, 1);
-         return;
-     }
-     void connect(int from, int layerDim, int inputDim)
-     {
-         dW[from] = Mat<T>(layerDim, inputDim);
-         Sw[from] = Mat<T>(layerDim, inputDim);
-         Vw[from] = Mat<T>(layerDim, inputDim);
-         return;
-     }
-};
+    Adam():alpha1(1), alpha2(1){}
+    Adam(const Adam &adam)
+    {
+        dW = adam.dW;
+        dB = adam.dB;
+        E = adam.E;
+        Sw = adam.Vw;
+        Sb = adam.Vb;
+        Vw = adam.Vw;
+        Vb = adam.Vb;
+        alpha1 = adam.alpha1;
+        alpha2 = adam.alpha2;
+        return;
+    }
+    Adam& operator=(const Adam &adam)
+    {
+        if (this == &adam) {
+            return *this;
+        }
+        dW = adam.dW;
+        dB = adam.dB;
+        E = adam.E;
+        Sw = adam.Vw;
+        Sb = adam.Vb;
+        Vw = adam.Vw;
+        Vb = adam.Vb;
+        alpha1 = adam.alpha1;
+        alpha2 = adam.alpha2;
+        return *this;
+    }
+    Adam(LayerType layerType, int layerDim, int inputDim):alpha1(1), alpha2(1)
+    {
+        if (layerType == INPUT) {
+            dW[0] = Mat<T>(layerDim, inputDim);
+            Sw[0] = Mat<T>(layerDim, inputDim);
+            Vw[0] = Mat<T>(layerDim, inputDim);
+        }
+        E = Mat<T>(layerDim, 1);
+        dB = Mat<T>(layerDim, 1);
+        Sb = Mat<T>(layerDim, 1);
+        Vb = Mat<T>(layerDim, 1);
+        return;
+    }
+    void connect(int from, int layerDim, int inputDim)
+    {
+        dW[from] = Mat<T>(layerDim, inputDim);
+        Sw[from] = Mat<T>(layerDim, inputDim);
+        Vw[from] = Mat<T>(layerDim, inputDim);
+        return;
+    }
 
-template <typename T, bool onTrain>
-class Layer:public std::conditional<onTrain, OptParam<T>, OptNull<T> >::type
+    void _(const std::vector<int> &previous,
+           LayerType layerType,
+           double learningRate,
+           std::map<int, Mat<T> > &W,
+           Mat<T> &B)
+    {
+        alpha1 *= alpha1Factor;
+        alpha2 *= alpha2Factor;
+        if (layerType == INPUT) {
+            Vw[0] = Vw[0] * alpha1 + dW[0] * (1 - alpha1);
+            Sw[0] = Sw[0] * alpha2 + (dW[0] % dW[0]) * (1 - alpha2);
+            Mat<T> Vwt = Vw[0] / (1 - alpha1);
+            Mat<T> Swt = Sw[0] / (1 - alpha2);
+            W[0] -= Vwt / (SQRT(Swt) + 1e-9) * learningRate;
+            dW[0].zero();
+        } else {
+            for (int from : previous) {
+                Vw[from] = Vw[from] * alpha1 + dW[from] * (1 - alpha1);
+                Sw[from] = Sw[from] * alpha2 + (dW[from] % dW[from]) * (1 - alpha2);
+                Mat<T> Vwt = Vw[from] / (1 - alpha1);
+                Mat<T> Swt = Sw[from] / (1 - alpha2);
+                W[from] -= Vwt / (SQRT(Swt) + 1e-9) * learningRate;
+                dW[from].zero();
+            }
+        }
+        Vb = Vb * alpha1 + dB * (1 - alpha1);
+        Sb = Sb * alpha2 + (dB % dB) * (1 - alpha2);
+        Mat<T> Vbt = Vb / (1 - alpha1);
+        Mat<T> Sbt = Sb / (1 - alpha2);
+        B -= Vbt / (SQRT(Sbt) + 1e-9) * learningRate;
+        dB.zero();
+        return;
+    }
+};
+template<typename T>
+T Adam<T>::alpha1Factor(0.9);
+template<typename T>
+T Adam<T>::alpha2Factor(0.99);
+
+template <typename T, template<typename> class OptimizeF>
+class Layer : public OptimizeF<T>
 {
-public:
-    using TOpt = typename std::conditional<onTrain, OptParam<T>, OptNull<T> >::type;
-    typedef double (*FuncType)(double);
 public:
     std::map<int, Mat<T> > W;
     Mat<T> B;
@@ -110,12 +299,10 @@ public:
     int inputDim;
     LossType lossType;
     LayerType layerType;
-    static FuncType ActiveFunc[4];
-    static FuncType dActiveFunc[4];
 public:
     Layer():layerDim(0), inputDim(0){}
     virtual ~Layer(){}
-    void copyFrom(const Layer& layer)
+    Layer(const Layer& layer):OptimizeF<T>(layer)
     {
         W = layer.W;
         B = layer.B;
@@ -125,36 +312,35 @@ public:
         inputDim = layer.inputDim;
         lossType = layer.lossType;
         layerType = layer.layerType;
-        return TOpt::copyFrom(layer);
-    }
-    Layer(const Layer& layer)
-    {
-        copyFrom(layer);
     }
     Layer& operator = (const Layer& layer)
     {
         if (this == &layer) {
             return *this;
         }
-        copyFrom(layer);
+        W = layer.W;
+        B = layer.B;
+        O = layer.O;
+        /* paramter */
+        layerDim = layer.layerDim;
+        inputDim = layer.inputDim;
+        lossType = layer.lossType;
+        layerType = layer.layerType;
+        OptimizeF<T>::operator=(layer);
         return *this;
     }
-    Layer(LayerType layerType,
-          LossType lossType,
-          int layerDim)
+    Layer(LayerType layerType, LossType lossType, int layerDim):
+        OptimizeF<T>(layerType, layerDim, 1)
     {
         this->layerDim = layerDim;
         this->lossType = lossType;
         this->layerType = layerType;
         B = Mat<T>(layerDim, 1, UNIFORM_RAND);
         O = Mat<T>(layerDim, 1);
-        TOpt::init(layerType, layerDim, 1);
     }
 
-    Layer(LayerType layerType,
-          LossType lossType,
-          int layerDim,
-          int inputDim)
+    Layer(LayerType layerType, LossType lossType, int layerDim, int inputDim) :
+        OptimizeF<T>(layerType, layerDim, inputDim)
     {
         this->layerDim = layerDim;
         this->inputDim = inputDim;
@@ -163,38 +349,45 @@ public:
         W[0] = Mat<T>(layerDim, inputDim, UNIFORM_RAND);
         B = Mat<T>(layerDim, 1, UNIFORM_RAND);
         O = Mat<T>(layerDim, 1);
-        TOpt::init(layerType, layerDim, inputDim);
     }
 
     void connect(int from, int inputDim)
     {
         W[from] = Mat<T>(layerDim, inputDim, UNIFORM_RAND);
-        return TOpt::connect(from, layerDim, inputDim);
+        return OptimizeF<T>::connect(from, layerDim, inputDim);
+    }
+    void optimize(const std::vector<int> &previous, double learningRate)
+    {
+        return OptimizeF<T>::_(previous, layerType, learningRate, W, B);
     }
 };
 
-template <typename T, template<typename> class ActivateF, bool onTrain = true>
-class MLP : public Graph<Layer<T, onTrain> >
+template <typename T,
+          template<typename> class ActivateF = Relu,
+          template<typename> class OptimizeF = SGD>
+class MLP : public Graph<Layer<T, OptimizeF> >
 {
 public:
    using DataType = T;
-   using DAG = Graph<Layer<T, onTrain> >;
+   using DAG = Graph<Layer<T, OptimizeF> >;
    using Input = std::map<std::string, Mat<T> >;
    using InputVec = std::vector<Input>;
    using Target = std::vector<Mat<T> >;
    using Targets = std::map<std::string, Mat<T> >;
+   using Flat = MLP<T, ActivateF, NoneOpt>;
 public:
     MLP(){}
     ~MLP(){}
+    MLP(const MLP& mlp):DAG(mlp){}
     MLP& operator = (const MLP& mlp)
     {
         if (this == &mlp) {
             return *this;
         }
-        DAG::copy(mlp);
+        DAG::operator=(mlp);
         return *this;
     }
-    void addLayer(const Layer<T, onTrain> &layer, const std::string &layerName)
+    void addLayer(const Layer<T, OptimizeF> &layer, const std::string &layerName)
     {
         return DAG::insertVertex(layer, layerName);
     }
@@ -204,7 +397,7 @@ public:
                   int layerDim,
                   const std::string &layerName)
     {
-        return DAG::insertVertex(Layer<T, onTrain>(layerType, lossType, layerDim), layerName);
+        return DAG::insertVertex(Layer<T, OptimizeF>(layerType, lossType, layerDim), layerName);
     }
 
     void addLayer(LayerType layerType,
@@ -213,7 +406,7 @@ public:
                   int inputDim,
                   const std::string &layerName)
     {
-        return DAG::insertVertex(Layer<T, onTrain>(layerType, lossType, layerDim, inputDim), layerName);
+        return DAG::insertVertex(Layer<T, OptimizeF>(layerType, lossType, layerDim, inputDim), layerName);
     }
 
     void connectLayer(const std::string &fromName, const std::string &toName)
@@ -230,9 +423,9 @@ public:
         return DAG::insertEdge(from, to);
     }
 
-    MLP<T, ActivateF, false> clone()
+    Flat clone()
     {
-        MLP<T, ActivateF, false> dst;
+        Flat dst;
         /* copy vertexs */
         for (auto& x : DAG::vertexs) {
             auto& layer = x.object;
@@ -262,7 +455,7 @@ public:
         return dst;
     }
 
-    void copyTo(MLP<T, ActivateF, false>& dst)
+    void copyTo(Flat& dst)
     {
         for (int i = 0; i < DAG::vertexs.size(); i++) {
             dst.vertexs[i].object.W = DAG::vertexs[i].object.W;
@@ -271,7 +464,7 @@ public:
         return;
     }
 
-    void softUpdateTo(MLP<T, ActivateF, false>& dst, double alpha)
+    void softUpdateTo(Flat& dst, double alpha)
     {
         for (int  current : DAG::topologySequence) {
             auto &layer = DAG::getObject(current);
@@ -357,148 +550,19 @@ public:
         }
         return;
     }
-
-    void SGD(double learningRate)
+    void optimize(double learningRate)
     {
         if (!DAG::isDAG()) {
             return;
         }
         for (int current : DAG::topologySequence) {
-            auto &layer = DAG::getObject(current);
-            if (layer.layerType == INPUT) {
-                layer.W[0] -= layer.dW[0] * learningRate;
-                layer.dW[0].zero();
-            } else {
-                for (int from : DAG::previous.at(current)) {
-                    layer.W[from] -= layer.dW[from] * learningRate;
-                    layer.dW[from].zero();
-                }
-            }
-            layer.B -= layer.dB * learningRate;
-            layer.dB.zero();
+            DAG::getObject(current).optimize(DAG::previous.at(current), learningRate);
         }
         return;
     }
-
-    void RMSProp(double rho, double learningRate)
-    {
-        if (!DAG::isDAG()) {
-            return;
-        }
-        for (int current : DAG::topologySequence) {
-            auto&layer = DAG::getObject(current);
-            if (layer.layerType == INPUT) {
-                layer.Sw[0] = layer.Sw[0] * rho + (layer.dW[0] % layer.dW[0]) * (1 - rho);
-                layer.W[0] -= layer.dW[0] / (SQRT(layer.Sw[0]) + 1e-9) * learningRate;
-                layer.dW[0].zero();
-            } else {
-                for (int from : DAG::previous.at(current)) {
-                    layer.Sw[from] = layer.Sw[from] * rho + (layer.dW[from] % layer.dW[from]) * (1 - rho);
-                    layer.W[from] -= layer.dW[from] / (SQRT(layer.Sw[from]) + 1e-9) * learningRate;
-                    layer.dW[from].zero();
-                }
-            }
-            layer.Sb = layer.Sb * rho + (layer.dB % layer.dB) * (1 - rho);
-            layer.B -= layer.dB / (SQRT(layer.Sb) + 1e-9)* learningRate;
-            layer.dB.zero();
-        }
-        return;
-    }
-
-    void Adam(double alpha1, double alpha2, double learningRate)
-    {
-        if (!DAG::isDAG()) {
-            return;
-        }
-        for (int current : DAG::topologySequence) {
-            auto& layer = DAG::getObject(current);
-            layer.alpha1 *= alpha1;
-            layer.alpha2 *= alpha2;
-            if (layer.layerType == INPUT) {
-                layer.Vw[0] = layer.Vw[0] * alpha1 + layer.dW[0] * (1 - alpha1);
-                layer.Sw[0] = layer.Sw[0] * alpha2 + (layer.dW[0] % layer.dW[0]) * (1 - alpha2);
-                Mat<T> Vwt = layer.Vw[0] / (1 - layer.alpha1);
-                Mat<T> Swt = layer.Sw[0] / (1 - layer.alpha2);
-                layer.W[0] -= Vwt / (SQRT(Swt) + 1e-9) * learningRate;
-                layer.dW[0].zero();
-            } else {
-                for (int from : DAG::previous.at(current)) {
-                    layer.Vw[from] = layer.Vw[from] * alpha1 + layer.dW[from] * (1 - alpha1);
-                    layer.Sw[from] = layer.Sw[from] * alpha2 + (layer.dW[from] % layer.dW[from]) * (1 - alpha2);
-                    Mat<T> Vwt = layer.Vw[from] / (1 - layer.alpha1);
-                    Mat<T> Swt = layer.Sw[from] / (1 - layer.alpha2);
-                    layer.W[from] -= Vwt / (SQRT(Swt) + 1e-9) * learningRate;
-                    layer.dW[from].zero();
-                }
-            }
-            layer.Vb = layer.Vb * alpha1 + layer.dB * (1 - alpha1);
-            layer.Sb = layer.Sb * alpha2 + (layer.dB % layer.dB) * (1 - alpha2);
-            Mat<T> Vbt = layer.Vb / (1 - layer.alpha1);
-            Mat<T> Sbt = layer.Sb / (1 - layer.alpha2);
-            layer.B -= Vbt / (SQRT(Sbt) + 1e-9) * learningRate;
-            layer.dB.zero();
-        }
-        return;
-    }
-
-    void optimize(OptType optType, double learningRate)
-    {
-        switch (optType) {
-        case OPT_SGD:
-            SGD(learningRate);
-            break;
-        case OPT_RMSPROP:
-            RMSProp(0.9, learningRate);
-            break;
-        case OPT_ADAM:
-            Adam(0.9, 0.99, learningRate);
-            break;
-        default:
-            RMSProp(0.9, learningRate);
-            break;
-        }
-        return;
-    }
-
     void show()
     {
         DAG::vertexs[DAG::topologySequence.size() - 1].object.O.show();
-        return;
-    }
-
-    void load(const std::string& fileName)
-    {
-        std::ifstream file;
-        file.open(fileName);
-        if (!file.is_open()) {
-            return;
-        }
-        for (int i : DAG::topologySequence) {
-            auto &layer = DAG::getObject(i);
-            for (int from : DAG::previous.at(i)) {
-                layer.W[from].load(fileName);
-            }
-            layer.B.load(fileName);
-        }
-        file.close();
-        return;
-    }
-
-    void save(const std::string& fileName)
-    {
-        std::ifstream file;
-        file.open(fileName);
-        if (!file.is_open()) {
-            return;
-        }
-        for (int i : DAG::topologySequence) {
-            auto &layer = DAG::getObject(i);
-            for (int from : DAG::previous.at(i)) {
-                layer.W[from].save(fileName);
-            }
-            layer.B.save(fileName);
-        }
-        file.close();
         return;
     }
 };

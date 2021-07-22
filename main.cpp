@@ -5,7 +5,7 @@ using namespace lstm;
 void test_DAG()
 {
     std::cout<<"mlp"<<std::endl;
-    MLP<double, Sigmoid> mlp;
+    MLP<double, Sigmoid, Adam> mlp;
     /* add layer */
     std::cout<<"add layer"<<std::endl;
     mlp.addLayer(INPUT, MSE, 4, 4, "input1");
@@ -37,7 +37,7 @@ void test_DAG()
 
     /* feed forward */
     std::cout<<"feed forward"<<std::endl;
-    MLP<double,Sigmoid>::Input x;
+    MLP<double,Sigmoid, Adam>::Input x;
     x["input1"] = Mat<double>(4, 1);
     x["input2"] = Mat<double>(4, 1);
     x["input3"] = Mat<double>(4, 1);
@@ -47,14 +47,8 @@ void test_DAG()
     Mat<double> y(4, 1);
     std::cout<<"gradient"<<std::endl;
     mlp.gradient(x, y);
-    std::cout<<"SGD"<<std::endl;
-    mlp.SGD(0.01);
-    mlp.show();
-    std::cout<<"RMSProp"<<std::endl;
-    mlp.RMSProp(0.9, 0.01);
-    mlp.show();
     std::cout<<"Adam"<<std::endl;
-    mlp.Adam(0.9, 0.99, 0.01);
+    mlp.optimize(0.01);
     mlp.show();
     return;
 }
@@ -69,7 +63,7 @@ void test_xor()
                   +-->-hidden2-->--+
     */
     std::cout<<"mlp"<<std::endl;
-    using BPNN = MLP<double, Relu, true>;
+    using BPNN = MLP<double, Relu, Adam>;
     BPNN bp;
     /* add layer */
     std::cout<<"add layer"<<std::endl;
@@ -119,7 +113,7 @@ void test_xor()
             bp.feedForward(x[k]);
             bp.gradient(x[k], y[k]);
         }
-        bp.RMSProp(0.9, 0.0001);
+        bp.optimize(0.0005);
     }
     /* classify */
     std::cout<<"classify"<<std::endl;
@@ -129,7 +123,7 @@ void test_xor()
     }
     /* clone */
     std::cout<<"clone:"<<std::endl;
-    MLP<double, Relu, false> predictNet = bp.clone();
+    BPNN::Flat predictNet = bp.clone();
     predictNet.showTopology();
     for (int i = 0; i < 4; i++) {
         predictNet.feedForward(x[i]);
