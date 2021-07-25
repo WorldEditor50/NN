@@ -36,7 +36,7 @@ public:
     void connect(int , int , int){}
     void _(const std::vector<int> &,
            LayerType ,
-           double ,
+           T ,
            std::map<int, Mat<T> > &,
            Mat<T> &){}
 };
@@ -82,7 +82,7 @@ public:
     }
     void _(const std::vector<int> &previous,
            LayerType layerType,
-           double learningRate,
+           T learningRate,
            std::map<int, Mat<T> > &W,
            Mat<T> &B)
     {
@@ -156,7 +156,7 @@ public:
     }
     void _(const std::vector<int> &previous,
            LayerType layerType,
-           double learningRate,
+           T learningRate,
            std::map<int, Mat<T> > &W,
            Mat<T> &B)
     {
@@ -250,7 +250,7 @@ public:
 
     void _(const std::vector<int> &previous,
            LayerType layerType,
-           double learningRate,
+           T learningRate,
            std::map<int, Mat<T> > &W,
            Mat<T> &B)
     {
@@ -302,17 +302,15 @@ public:
 public:
     Layer():layerDim(0), inputDim(0){}
     virtual ~Layer(){}
-    Layer(const Layer& layer):OptimizeF<T>(layer)
-    {
-        W = layer.W;
-        B = layer.B;
-        O = layer.O;
-        /* paramter */
-        layerDim = layer.layerDim;
-        inputDim = layer.inputDim;
-        lossType = layer.lossType;
-        layerType = layer.layerType;
-    }
+    Layer(const Layer& layer):
+        OptimizeF<T>(layer),
+        W(layer.W),
+        B(layer.B),
+        O(layer.O),
+        layerDim(layer.layerDim),
+        inputDim(layer.inputDim),
+        lossType(layer.lossType),
+        layerType(layer.layerType) {}
     Layer& operator = (const Layer& layer)
     {
         if (this == &layer) {
@@ -329,12 +327,12 @@ public:
         OptimizeF<T>::operator=(layer);
         return *this;
     }
-    Layer(LayerType layerType, LossType lossType, int layerDim):
-        OptimizeF<T>(layerType, layerDim, 1)
+    Layer(LayerType layerType_, LossType lossType_, int layerDim_):
+        OptimizeF<T>(layerType_, layerDim_, 1)
     {
-        this->layerDim = layerDim;
-        this->lossType = lossType;
-        this->layerType = layerType;
+        layerDim = layerDim_;
+        lossType = lossType_;
+        layerType = layerType_;
         B = Mat<T>(layerDim, 1, UNIFORM_RAND);
         O = Mat<T>(layerDim, 1);
     }
@@ -351,12 +349,13 @@ public:
         O = Mat<T>(layerDim, 1);
     }
 
-    void connect(int from, int inputDim)
+    void connect(int from, int inputDim_)
     {
+        this->inputDim = inputDim_;
         W[from] = Mat<T>(layerDim, inputDim, UNIFORM_RAND);
         return OptimizeF<T>::connect(from, layerDim, inputDim);
     }
-    void optimize(const std::vector<int> &previous, double learningRate)
+    void optimize(const std::vector<int> &previous, T learningRate)
     {
         return OptimizeF<T>::_(previous, layerType, learningRate, W, B);
     }

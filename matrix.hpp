@@ -522,11 +522,11 @@ inline double drelu(double y){return y > 0 ? 1 : 0;}
 inline double dtanh(double y){return 1 - y * y;}
 inline double dlinear(double){return 1;}
 template <typename T>
-Mat<T> LOG(const Mat<T> &x){return for_each(x, log);}
+Mat<T> LOG(const Mat<T> &x){return for_each(x, static_cast<double(*)(double)>(log));}
 template <typename T>
-Mat<T> EXP(const Mat<T> &x){return for_each(x, exp);}
+Mat<T> EXP(const Mat<T> &x){return for_each(x, static_cast<double(*)(double)>(exp));}
 template <typename T>
-Mat<T> SQRT(const Mat<T> &x){return for_each(x, sqrt);}
+Mat<T> SQRT(const Mat<T> &x){return for_each(x, static_cast<double(*)(double)>(sqrt));}
 
 template <typename T>
 class Sigmoid {
@@ -543,7 +543,7 @@ public:
 template <typename T>
 class Tanh {
 public:
-    static Mat<T> _(const Mat<T> &x){return for_each(x, tanh);}
+    static Mat<T> _(const Mat<T> &x){return for_each(x, static_cast<double(*)(double)>(tanh));}
     static Mat<T> d(const Mat<T> &y){return for_each(y, dtanh);}
 };
 template <typename T>

@@ -63,7 +63,7 @@ void test_xor()
                   +-->-hidden2-->--+
     */
     std::cout<<"mlp"<<std::endl;
-    using BPNN = MLP<double, Relu, Adam>;
+    using BPNN = MLP<float, Relu, Adam>;
     BPNN bp;
     /* add layer */
     std::cout<<"add layer"<<std::endl;
@@ -89,7 +89,7 @@ void test_xor()
     std::cout<<"training:"<<std::endl;
     BPNN::InputVec x(4);
     for (int i = 0; i < 4; i++) {
-        x[i]["input"] = Mat<double>(2, 1);
+        x[i]["input"] = Mat<BPNN::DataType>(2, 1);
     }
     x[0]["input"][0][0] = 0;
     x[0]["input"][1][0] = 0;
@@ -101,7 +101,7 @@ void test_xor()
     x[3]["input"][1][0] = 1;
     BPNN::Target y(4);
     for (int i = 0; i < 4; i ++) {
-        y[i] = Mat<double>(1, 1);
+        y[i] = Mat<BPNN::DataType>(1, 1);
     }
     y[0][0][0] = 0;
     y[1][0][0] = 1;

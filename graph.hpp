@@ -16,13 +16,8 @@ public:
 public:
     Edge():from(0), to(0), weight(0), enable(false){};
     ~Edge(){};
-    Edge(int from, int to, double weight)
-    {
-        this->from = from;
-        this->to = to;
-        this->weight = weight;
-        this->enable = true;
-    }
+    Edge(int from_, int to_, double weight_):
+        from(from_), to(to_), weight(weight_), enable(true){};
 };
 template<typename T>
 class Vertex
@@ -37,12 +32,18 @@ public:
     ~Vertex(){}
     Vertex(const T & obj, const std::string &vertexName):
          visited(false), indegree(0), name(vertexName), object(obj){}
-    Vertex(const Vertex & v)
+    Vertex(const Vertex & v):
+        visited(v.visited), indegree(v.indegree), name(v.name), object(v.object){}
+    Vertex& operator = (const Vertex & v)
     {
-        this->visited = v.visited;
-        this->indegree = v.indegree;
-        this->name = v.name;
-        this->object = v.object;
+        if (this == &v) {
+            return *this;
+        }
+        visited = v.visited;
+        indegree = v.indegree;
+        name = v.name;
+        object = v.object;
+        return *this;
     }
 };
 template<typename T>
