@@ -11,11 +11,22 @@
 #include <memory>
 namespace ML {
 
+
 enum MatType{
     ZERO = 0,
     IDENTITY,
     UNIFORM_RAND
 };
+class Pos
+{
+public:
+    int i;
+    int j;
+public:
+    Pos():i(0), j(0){}
+    Pos(int i_, int j_):i(i_), j(j_){}
+};
+
 template<typename T>
 class Mat
 {
@@ -24,7 +35,7 @@ public:
     int cols;
     std::vector<std::vector<T> > data;
 public:
-	Mat():rows(0), cols(0){}
+    Mat():rows(0), cols(0){}
     ~Mat(){}
     inline bool isShapeEqual(const Mat<T>& x)const{return (rows == x.rows && cols == x.cols);}
     inline bool isNull() const {return rows == 0 || cols == 0;}
@@ -459,7 +470,7 @@ Mat<T> for_each(const Mat<T>& x, std::function<double(double)> func)
 }
 
 template<typename T>
-T sum(Mat<T>& x)
+T sum(const Mat<T>& x)
 {
     T s = 0;
     for (int i = 0; i < x.rows; i++) {
@@ -471,7 +482,7 @@ T sum(Mat<T>& x)
 }
 
 template<typename T>
-T max(Mat<T>& x)
+T max(const Mat<T>& x)
 {
     T maxT = x.data[0][0];
     for (int i = 0; i < x.rows; i++) {
@@ -485,7 +496,7 @@ T max(Mat<T>& x)
 }
 
 template<typename T>
-T min(Mat<T>& x)
+T min(const Mat<T>& x)
 {
     T minT = x.data[0][0];
     for (int i = 0; i < x.rows; i++) {
@@ -497,6 +508,39 @@ T min(Mat<T>& x)
     }
     return minT;
 }
+
+template<typename T>
+Pos argmax(const Mat<T>& x)
+{
+    Pos pos;
+    T maxT = x.data[0][0];
+    for (int i = 0; i < x.rows; i++) {
+        for (int j = 0; j < x.cols; j++) {
+            if (maxT < x.data[i][j]) {
+                maxT = x.data[i][j];
+                pos = Pos(i, j);
+            }
+        }
+    }
+    return pos;
+}
+
+template<typename T>
+Pos argmin(Mat<T>& x)
+{
+    Pos pos;
+    T minT = x.data[0][0];
+    for (int i = 0; i < x.rows; i++) {
+        for (int j = 0; j < x.cols; j++) {
+            if (minT > x.data[i][j]) {
+                minT = x.data[i][j];
+                pos = Pos(i, j);
+            }
+        }
+    }
+    return pos;
+}
+
 template <typename T>
 Mat<T> Kronecker(const Mat<T> &x1, const Mat<T> &x2)
 {

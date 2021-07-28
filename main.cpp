@@ -64,24 +64,19 @@ void test_xor()
     */
     std::cout<<"mlp"<<std::endl;
     using BPNN = MLP<float, Relu, Adam>;
-    BPNN bp;
-    /* add layer */
-    std::cout<<"add layer"<<std::endl;
-    bp.addLayer(INPUT, MSE, 4, 2, "input");
-    bp.addLayer(HIDDEN, MSE, 4, "hidden1");
-    bp.addLayer(HIDDEN, MSE, 4, "hidden2");
-    bp.addLayer(OUTPUT, MSE, 1, "output");
-    /* connect */
-    std::cout<<"connect"<<std::endl;
-    bp.connectLayer("input", "hidden1");
-    bp.connectLayer("input", "hidden2");
-    bp.connectLayer("input", "output");
-    bp.connectLayer("hidden1", "output");
-    bp.connectLayer("hidden2", "output");
-    if (!bp.generate()) {
-        std::cout<<"failed mlp is not DAG";
-        return;
-    }
+    BPNN bp(BPNN::LayerParams {
+                {INPUT, MSE, 4, 2, "input"},
+                {HIDDEN, MSE, 4, 1, "hidden1"},
+                {HIDDEN, MSE, 4, 1, "hidden2"},
+                {OUTPUT, MSE, 1, 1, "output"}
+            },
+            BPNN::GraphParams {
+                {"input", "hidden1"},
+                {"input", "hidden2"},
+                {"input", "output"},
+                {"hidden1", "output"},
+                {"hidden2", "output"}
+            });
     std::cout<<"topology:"<<std::endl;
     bp.showTopology();
     bp.show();

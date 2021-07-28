@@ -257,24 +257,24 @@ public:
         alpha1 *= alpha1Factor;
         alpha2 *= alpha2Factor;
         if (layerType == INPUT) {
-            Vw[0] = Vw[0] * alpha1 + dW[0] * (1 - alpha1);
-            Sw[0] = Sw[0] * alpha2 + (dW[0] % dW[0]) * (1 - alpha2);
+            Vw[0] = Vw[0] * alpha1Factor + dW[0] * (1 - alpha1Factor);
+            Sw[0] = Sw[0] * alpha2Factor + (dW[0] % dW[0]) * (1 - alpha2Factor);
             Mat<T> Vwt = Vw[0] / (1 - alpha1);
             Mat<T> Swt = Sw[0] / (1 - alpha2);
             W[0] -= Vwt / (SQRT(Swt) + 1e-9) * learningRate;
             dW[0].zero();
         } else {
             for (int from : previous) {
-                Vw[from] = Vw[from] * alpha1 + dW[from] * (1 - alpha1);
-                Sw[from] = Sw[from] * alpha2 + (dW[from] % dW[from]) * (1 - alpha2);
+                Vw[from] = Vw[from] * alpha1Factor + dW[from] * (1 - alpha1Factor);
+                Sw[from] = Sw[from] * alpha2Factor + (dW[from] % dW[from]) * (1 - alpha2Factor);
                 Mat<T> Vwt = Vw[from] / (1 - alpha1);
                 Mat<T> Swt = Sw[from] / (1 - alpha2);
                 W[from] -= Vwt / (SQRT(Swt) + 1e-9) * learningRate;
                 dW[from].zero();
             }
         }
-        Vb = Vb * alpha1 + dB * (1 - alpha1);
-        Sb = Sb * alpha2 + (dB % dB) * (1 - alpha2);
+        Vb = Vb * alpha1Factor + dB * (1 - alpha1Factor);
+        Sb = Sb * alpha2Factor + (dB % dB) * (1 - alpha2Factor);
         Mat<T> Vbt = Vb / (1 - alpha1);
         Mat<T> Sbt = Sb / (1 - alpha2);
         B -= Vbt / (SQRT(Sbt) + 1e-9) * learningRate;
@@ -361,19 +361,37 @@ public:
     }
 };
 
+
 template <typename T,
           template<typename> class ActivateF = Relu,
           template<typename> class OptimizeF = SGD>
 class MLP : public Graph<Layer<T, OptimizeF> >
 {
 public:
-   using DataType = T;
-   using DAG = Graph<Layer<T, OptimizeF> >;
-   using Input = std::map<std::string, Mat<T> >;
-   using InputVec = std::vector<Input>;
-   using Target = std::vector<Mat<T> >;
-   using Targets = std::map<std::string, Mat<T> >;
-   using Flat = MLP<T, ActivateF, NoneOpt>;
+    struct LayerParam
+    {
+        LayerType layerType;
+        LossType lossType;
+        int layerDim;
+        int inputDim;
+        std::string layerName;
+    };
+    struct EdgeParam
+    {
+        std::string fromName;
+        std::string toName;
+    };
+
+    using DataType = T;
+    using TLayer = Layer<T, OptimizeF>;
+    using LayerParams = std::vector<LayerParam>;
+    using GraphParams = std::vector<EdgeParam>;
+    using DAG = Graph<Layer<T, OptimizeF> >;
+    using Input = std::map<std::string, Mat<T> >;
+    using InputVec = std::vector<Input>;
+    using Target = std::vector<Mat<T> >;
+    using Targets = std::map<std::string, Mat<T> >;
+    using Flat = MLP<T, ActivateF, NoneOpt>;
 public:
     MLP(){}
     ~MLP(){}
@@ -386,9 +404,26 @@ public:
         DAG::operator=(mlp);
         return *this;
     }
-    void addLayer(const Layer<T, OptimizeF> &layer, const std::string &layerName)
+    MLP(const LayerParams& layerParam, const GraphParams& graphParam)
     {
-        return DAG::insertVertex(layer, layerName);
+        for (int i = 0; i < layerParam.size(); i++) {
+            if (layerParam[i].layerType == INPUT) {
+                DAG::insertVertex(TLayer(layerParam[i].layerType,
+                                         layerParam[i].lossType,
+                                         layerParam[i].layerDim,
+                                         layerParam[i].inputDim),
+                                  layerParam[i].layerName);
+            } else {
+                DAG::insertVertex(TLayer(layerParam[i].layerType,
+                                         layerParam[i].lossType,
+                                         layerParam[i].layerDim),
+                                  layerParam[i].layerName);
+            }
+        }
+        for (int i = 0; i < graphParam.size(); i++) {
+             connectLayer(graphParam[i].fromName, graphParam[i].toName);
+        }
+        DAG::generate();
     }
 
     void addLayer(LayerType layerType,
@@ -396,7 +431,7 @@ public:
                   int layerDim,
                   const std::string &layerName)
     {
-        return DAG::insertVertex(Layer<T, OptimizeF>(layerType, lossType, layerDim), layerName);
+        return DAG::insertVertex(TLayer(layerType, lossType, layerDim), layerName);
     }
 
     void addLayer(LayerType layerType,
@@ -405,7 +440,7 @@ public:
                   int inputDim,
                   const std::string &layerName)
     {
-        return DAG::insertVertex(Layer<T, OptimizeF>(layerType, lossType, layerDim, inputDim), layerName);
+        return DAG::insertVertex(TLayer(layerType, lossType, layerDim, inputDim), layerName);
     }
 
     void connectLayer(const std::string &fromName, const std::string &toName)
