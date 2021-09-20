@@ -114,3 +114,53 @@
 - **const_cast**
 
   
+
+
+
+### 3. inline的作用
+
+- **内联**
+
+  ## 内联函数与一般函数区别
+
+  1）内联含函数比一般函数在前面多一个inline修饰符。
+
+  2）内联函数是直接复制“镶嵌”到主函数中去的，就是将内联函数的代码直接放在内联函数的位置上，这与一般函数不同，主函数在调用一般函数的时候，是指令跳转到被调用函数的入口地址，执行完被调用函数后，指令再跳转回主函数上继续执行后面的代码；而由于内联函数是将函数的代码直接放在了函数的位置上，所以没有指令跳转，指令按顺序执行。
+
+  3）一般函数的代码段只有一份，放在内存中的某个位置上，当程序调用它时，指令就跳转过来；当下一次程序调用它是，指令又跳转过来；而内联函数是程序中调用几次内联函数，内联函数的代码就会复制几份放在对应的位置上
+
+  4）内联函数一般在头文件中定义，而一般函数在头文件中声明，在cpp中定义。
+
+  ```c++
+  /*
+  有inline关键字优化的函数类似于宏，函数调用时可以减少栈空间的使用，但函数是否会被内联有编译器决定
+  */
+  #define ADD(a, b) (a + b)
+  template<typename T>
+  inline T add(T a, T b) { return a + b;}
+  ```
+
+  
+
+- **避免多重定义**
+
+  ```c++
+     /*
+     	如果不加inline关键字，多个地方调用append会引起多重定义的编译错误，有inline关键字修饰的
+      函数允许存在多个同名实例而不会报多重定义，因为内联函数的汇编代码会被嵌入调用处所在的函数
+      */
+  	template <typename T>
+      inline void append(T t, std::string &dst) { dst += std::to_string(t);}
+      inline void append(const std::string& t, std::string &dst) { dst += t;}
+      inline void append(const char* t, std::string &dst) { dst += t;}
+      template <typename ...T>
+      inline std::string append(const T& ...t)
+      {
+          std::string dst;
+          int argv[] = {(append(t, dst), 0)...};
+          return dst;
+      }
+  ```
+
+  
+

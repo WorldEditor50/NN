@@ -605,5 +605,10 @@ Mat<T> SOFTMAX(Mat<T>& x)
     T s = sum(delta);
     return delta / (s + 1e-9);
 }
+
+
+using Mati = Mat<int>;
+using Matf = Mat<float>;
+using Matd = Mat<double>;
 }
 #endif // MATRIx_H

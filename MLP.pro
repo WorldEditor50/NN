@@ -23,6 +23,9 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
+    Vector.hpp \
+    allocator.hpp \
+    expression.hpp \
     graph.hpp \
     lstm.hpp \
     matrix.hpp \

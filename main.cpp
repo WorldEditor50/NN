@@ -1,5 +1,8 @@
 #include "mlp.hpp"
 #include "lstm.hpp"
+#include "expression.hpp"
+#include "Vector.hpp"
+
 using namespace lstm;
 
 void test_DAG()
@@ -178,10 +181,31 @@ void test_lstm()
     }
     return;
 }
-
+template <typename TExpr>
+void evaluate(const Exp::Expr<TExpr> &f)
+{
+    for (float x = 0; x < 100; x += 1.0) {
+        std::cout<<f(x)<<" ";
+    }
+    std::cout<<std::endl;
+    return;
+}
 int main()
 {
     srand((unsigned int)time(nullptr));
-    test_xor();
+    //test_xor();
+    /* expression */
+    Exp::Var x;
+    evaluate(x * x - x + Exp::Const(2));
+    Vector<double> x1(10);
+    x1.rand(10);
+    x1.show();
+    Vector<double> x2(10);
+    x2.rand(10);
+    x2.show();
+    Vector<double> x3 = x1 + x2;
+    x3.show();
+    auto x4 = x1 * x2 - (x1 + x2) / x1;
+    x4.show();
     return 0;
 }
