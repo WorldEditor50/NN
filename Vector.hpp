@@ -5,12 +5,19 @@
 #include <memory>
 #include "allocator.hpp"
 
+
 template <typename T, template<typename> class TAllocator = Allocator>
 class Vector
 {
 public:
     Vector():ptr(nullptr), size_(0){}
     explicit Vector(size_t N):ptr(allocator.allocate(N)), size_(N){}
+    explicit Vector(size_t N, T x):ptr(allocator.allocate(N)), size_(N)
+    {
+        for (int i = 0; i < size_; i++) {
+            ptr[i] = x;
+        }
+    }
     ~Vector()
     {
         if (ptr != nullptr) {
@@ -57,6 +64,9 @@ public:
 
     Vector operator + (const Vector &r)
     {
+        if (size_ != r.size_) {
+            return *this;
+        }
         Vector y(r.size_);
         for (int i = 0; i < size_; i++) {
             y.ptr[i] = ptr[i] + r.ptr[i];
@@ -66,6 +76,9 @@ public:
 
     Vector operator - (const Vector &r)
     {
+        if (size_ != r.size_) {
+            return *this;
+        }
         Vector y(r.size_);
         for (int i = 0; i < size_; i++) {
             y.ptr[i] = ptr[i] - r.ptr[i];
@@ -75,6 +88,9 @@ public:
 
     Vector operator * (const Vector &r)
     {
+        if (size_ != r.size_) {
+            return *this;
+        }
         Vector y(r.size_);
         for (int i = 0; i < size_; i++) {
             y.ptr[i] = ptr[i] * r.ptr[i];
@@ -84,6 +100,9 @@ public:
 
     Vector operator / (const Vector &r)
     {
+        if (size_ != r.size_) {
+            return *this;
+        }
         Vector y(r.size_);
         for (int i = 0; i < size_; i++) {
             y.ptr[i] = ptr[i] / r.ptr[i];
@@ -91,7 +110,7 @@ public:
         return y;
     }
 
-    Vector operator += (const Vector &r)
+    Vector& operator += (const Vector &r)
     {
         if (size_ != r.size_) {
             return *this;
@@ -102,7 +121,7 @@ public:
         return *this;
     }
 
-    Vector operator -= (const Vector &r)
+    Vector& operator -= (const Vector &r)
     {
         if (size_ != r.size_) {
             return *this;
@@ -113,7 +132,7 @@ public:
         return *this;
     }
 
-    Vector operator *= (const Vector &r)
+    Vector& operator *= (const Vector &r)
     {
         if (size_ != r.size_) {
             return *this;
@@ -124,7 +143,7 @@ public:
         return *this;
     }
 
-    Vector operator /= (const Vector &r)
+    Vector& operator /= (const Vector &r)
     {
         if (size_ != r.size_) {
             return *this;
@@ -134,6 +153,75 @@ public:
         }
         return *this;
     }
+
+    Vector operator + (T x)
+    {
+        Vector y(size_);
+        for (int i = 0; i < size_; i++) {
+            y.ptr[i] = ptr[i] + x;
+        }
+        return y;
+    }
+
+    Vector operator - (T x)
+    {
+        Vector y(size_);
+        for (int i = 0; i < size_; i++) {
+            y.ptr[i] = ptr[i] - x;
+        }
+        return y;
+    }
+
+    Vector operator * (T x)
+    {
+        Vector y(size_);
+        for (int i = 0; i < size_; i++) {
+            y.ptr[i] = ptr[i] * x;
+        }
+        return y;
+    }
+
+    Vector operator / (T x)
+    {
+        Vector y(size_);
+        for (int i = 0; i < size_; i++) {
+            y.ptr[i] = ptr[i] / x;
+        }
+        return y;
+    }
+
+    Vector& operator += (T x)
+    {
+        for (int i = 0; i < size_; i++) {
+            ptr[i] += x;
+        }
+        return *this;
+    }
+
+    Vector& operator -= (T x)
+    {
+        for (int i = 0; i < size_; i++) {
+            ptr[i] -= x;
+        }
+        return *this;
+    }
+
+    Vector& operator *= (T x)
+    {
+        for (int i = 0; i < size_; i++) {
+            ptr[i] *= x;
+        }
+        return *this;
+    }
+
+    Vector& operator /= (T x)
+    {
+        for (int i = 0; i < size_; i++) {
+            ptr[i] /= x;
+        }
+        return *this;
+    }
+
     void show()
     {
         for (int i = 0; i < size_; i++) {
@@ -145,7 +233,25 @@ public:
     void rand(int N)
     {
         std::default_random_engine e;
-        std::uniform_real_distribution<T> r(0, N);
+        std::uniform_int_distribution<int> r(0, N);
+        for (int i = 0; i < size_; i++) {
+            ptr[i] = r(e);
+        }
+        return;
+    }
+    void rand(float N)
+    {
+        std::default_random_engine e;
+        std::uniform_real_distribution<float> r(0, N);
+        for (int i = 0; i < size_; i++) {
+            ptr[i] = r(e);
+        }
+        return;
+    }
+    void rand(double N)
+    {
+        std::default_random_engine e;
+        std::uniform_real_distribution<double> r(0, N);
         for (int i = 0; i < size_; i++) {
             ptr[i] = r(e);
         }
@@ -163,4 +269,17 @@ private:
 template <typename T, template<typename> class TAllocator>
 TAllocator<T> Vector<T, TAllocator>::allocator;
 
+using Vectori = Vector<int>;
+using Vectorf = Vector<float>;
+using Vectord = Vector<double>;
+
+template<typename T>
+T dot(const Vector<T> &x1, const Vector<T> &x2)
+{
+    T s = 0;
+    for (int i = 0; i < x1.size_; i++) {
+        s += x1.ptr[i] * x2.ptr[i];
+    }
+    return s;
+}
 #endif // VECTOR_HPP

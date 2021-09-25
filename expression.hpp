@@ -38,7 +38,6 @@ template<typename TLeft, typename TRight, template<typename> class TFunctor>
 class BinaryOperator
 {
 public:
-    using T = float;
     BinaryOperator(){}
     explicit BinaryOperator(const TLeft &left_, const TRight &right_):
         left(left_), right(right_){}

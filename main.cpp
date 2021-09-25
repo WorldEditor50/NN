@@ -2,6 +2,7 @@
 #include "lstm.hpp"
 #include "expression.hpp"
 #include "Vector.hpp"
+#include "VectorExpr.hpp"
 
 using namespace lstm;
 
@@ -195,17 +196,17 @@ int main()
     srand((unsigned int)time(nullptr));
     //test_xor();
     /* expression */
-    Exp::Var x;
-    evaluate(x * x - x + Exp::Const(2));
-    Vector<double> x1(10);
-    x1.rand(10);
-    x1.show();
-    Vector<double> x2(10);
-    x2.rand(10);
-    x2.show();
-    Vector<double> x3 = x1 + x2;
-    x3.show();
-    auto x4 = x1 * x2 - (x1 + x2) / x1;
-    x4.show();
+//    Exp::Var x;
+//    evaluate(x * x - x + Exp::Const(2));
+//    Vector<double> x1(10, 3);
+//    x1.show();
+//    Vector<double> x2(10, 2);
+//    x2.show();
+//    auto x3 = x1 * x2 - (x1 + x2) / x1 * 10 + 30;
+//    x3.show();
+    VectorExp::Vector u(10, 2);
+    VectorExp::Vector v(10, 3);
+    auto z = u + v;
+    std::cout<<z[5]<<std::endl;
     return 0;
 }

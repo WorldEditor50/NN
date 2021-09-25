@@ -24,6 +24,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     Vector.hpp \
+    VectorExpr.hpp \
     allocator.hpp \
     expression.hpp \
     graph.hpp \

@@ -42,7 +42,7 @@ public:
     inline bool isSquare()const {return rows == cols;}
     inline T& at(int row, int col) {return data[row][col];}
     std::vector<T>& operator[](int i){return data[i];}
-    Mat<T>& create(int rows, int cols)
+    Mat& create(int rows, int cols)
     {
         this->rows = rows;
         this->cols = cols;
@@ -127,7 +127,7 @@ public:
         assign(x);
     }
 
-    Mat<T> operator = (const Mat<T>& x)
+    Mat operator = (const Mat& x)
     {
         if (this == &x) {
             return *this;
@@ -174,13 +174,13 @@ public:
         return;
     }
 
-    Mat<T> operator + (const Mat<T>& x)
+    Mat operator + (const Mat& x)
     {
         if (!isShapeEqual(x)) {
             std::cout<<"+ size is not matched"<<std::endl;
             return *this;
         }
-        Mat<T> y(rows, cols);
+        Mat y(rows, cols);
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 y.data[i][j] = data[i][j] + x.data[i][j];
@@ -189,7 +189,7 @@ public:
         return y;
     }
 
-    Mat<T> operator - (const Mat<T>& x)
+    Mat operator - (const Mat& x)
     {
         if (!isShapeEqual(x)) {
             std::cout<<"- size is not matched"<<std::endl;
@@ -206,7 +206,7 @@ public:
         return y;
     }
 
-    Mat<T> operator * (const Mat<T>& x)
+    Mat operator * (const Mat& x)
     {
         if (cols != x.rows) {
             std::cout<<"* size is not matched"<<std::endl;
@@ -216,7 +216,7 @@ public:
         int m = rows;
         int p = cols;
         int n = x.cols;
-        Mat<T> y(m, n);
+        Mat y(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
                 for (int k = 0; k < p; k++) {
@@ -227,7 +227,7 @@ public:
         return y;
     }
 
-    Mat<T> operator / (const Mat<T>& x)
+    Mat operator / (const Mat& x)
     {
         if (!isShapeEqual(x)) {
             std::cout<<"/ size is not matched"<<std::endl;
@@ -242,13 +242,13 @@ public:
         return y;
     }
 
-    Mat<T> operator % (const Mat<T>& x)
+    Mat operator % (const Mat& x)
     {
         if (!isShapeEqual(x)) {
             std::cout<<"% size is not matched"<<std::endl;
             return *this;
         }
-        Mat<T> y(rows, cols);
+        Mat y(rows, cols);
         for (int i = 0; i < y.rows; i++) {
             for (int j = 0; j < y.cols; j++) {
                 y.data[i][j] = data[i][j] * x.data[i][j];
@@ -257,7 +257,7 @@ public:
         return y;
     }
 
-    Mat<T>& operator += (const Mat<T>& x)
+    Mat& operator += (const Mat& x)
     {
         if (!isShapeEqual(x)) {
             std::cout<<"+= size is not matched"<<std::endl;
@@ -271,7 +271,7 @@ public:
         return *this;
     }
 
-    Mat<T>& operator -= (const Mat<T>& x)
+    Mat& operator -= (const Mat& x)
     {
         if (!isShapeEqual(x)) {
             std::cout<<"-= size is not matched"<<std::endl;
@@ -285,7 +285,7 @@ public:
         return *this;
     }
 
-    Mat<T>& operator /= (const Mat<T>& x)
+    Mat& operator /= (const Mat& x)
     {
         if (!isShapeEqual(x)) {
             std::cout<<"/= size is not matched"<<std::endl;
@@ -299,7 +299,7 @@ public:
         return *this;
     }
 
-    Mat<T>& operator %= (const Mat<T>& x)
+    Mat& operator %= (const Mat& x)
     {
         if (!isShapeEqual(x)) {
             std::cout<<"%= size is not matched"<<std::endl;
@@ -313,9 +313,9 @@ public:
         return *this;
     }
 
-    Mat<T> operator + (T x)
+    Mat operator + (T x)
     {
-        Mat<T> y(rows, cols);
+        Mat y(rows, cols);
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 y.data[i][j] = data[i][j] + x;
@@ -324,9 +324,9 @@ public:
         return y;
     }
 
-    Mat<T> operator - (T x)
+    Mat operator - (T x)
     {
-        Mat<T> y(rows, cols);
+        Mat y(rows, cols);
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 y.data[i][j] = data[i][j] - x;
@@ -335,9 +335,9 @@ public:
         return y;
     }
 
-    Mat<T> operator * (T x)
+    Mat operator * (T x)
     {
-        Mat<T> y(rows, cols);
+        Mat y(rows, cols);
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 y.data[i][j] = data[i][j] * x;
@@ -346,9 +346,9 @@ public:
         return y;
     }
 
-    Mat<T> operator / (T x)
+    Mat operator / (T x)
     {
-        Mat<T> y(rows, cols);
+        Mat y(rows, cols);
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 y.data[i][j] = data[i][j] / x;
@@ -357,7 +357,7 @@ public:
         return y;
     }
 
-    Mat<T>& operator += (T x)
+    Mat& operator += (T x)
     {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -367,7 +367,7 @@ public:
         return *this;
     }
 
-    Mat<T>& operator -= (T x)
+    Mat& operator -= (T x)
     {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -377,7 +377,7 @@ public:
         return *this;
     }
 
-    Mat<T>& operator *= (T x)
+    Mat& operator *= (T x)
     {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -387,7 +387,7 @@ public:
         return *this;
     }
 
-    Mat<T>& operator /= (T x)
+    Mat& operator /= (T x)
     {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -397,9 +397,9 @@ public:
         return *this;
     }
 
-    Mat<T> Tr()
+    Mat Tr()
     {
-        Mat<T> y(cols,rows);
+        Mat y(cols,rows);
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 y.data[j][i] = data[i][j];
@@ -408,9 +408,9 @@ public:
         return y;
     }
 
-    Mat<T> subset(int fromRow, int fromCol, int rowOffset, int colOffset)
+    Mat subset(int fromRow, int fromCol, int rowOffset, int colOffset)
     {
-        Mat<T> y(rowOffset, colOffset);
+        Mat y(rowOffset, colOffset);
         int r = (fromRow + rowOffset > rows)?rows:(fromRow + rowOffset);
         int c = (fromCol + colOffset > cols)?cols:(fromCol + colOffset);
         for (int i = fromRow; i < r; i++) {
@@ -421,7 +421,7 @@ public:
         return y;
     }
 
-    void set(int fromRow, int fromCol, const Mat<T> &x)
+    void set(int fromRow, int fromCol, const Mat &x)
     {
         int r = (fromRow + x.rows > rows)?rows:(fromRow + x.rows);
         int c = (fromCol + x.cols > cols)?cols:(fromCol + x.cols);
