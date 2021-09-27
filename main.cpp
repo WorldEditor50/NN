@@ -3,6 +3,7 @@
 #include "expression.hpp"
 #include "Vector.hpp"
 #include "VectorExpr.hpp"
+#include <chrono>
 
 using namespace lstm;
 
@@ -198,15 +199,32 @@ int main()
     /* expression */
 //    Exp::Var x;
 //    evaluate(x * x - x + Exp::Const(2));
-//    Vector<double> x1(10, 3);
-//    x1.show();
-//    Vector<double> x2(10, 2);
-//    x2.show();
-//    auto x3 = x1 * x2 - (x1 + x2) / x1 * 10 + 30;
-//    x3.show();
-    VectorExp::Vector u(10, 2);
-    VectorExp::Vector v(10, 3);
-    auto z = u + v;
-    std::cout<<z[5]<<std::endl;
+    size_t N = 1000000;
+    Vector<double> x1(N, 5);
+    Vector<double> x2(N, 7);
+    auto start = std::chrono::system_clock::now();
+    auto x3 = x1/x2  + x2/x1 + x1 * x1 - x2*x2 + x1 * x2;
+    x3.show();
+    auto end = std::chrono::system_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    double t1 = (double(duration.count()) *
+                         std::chrono::microseconds::period::num /
+                         std::chrono::microseconds::period::den);
+
+    VectorExpr::Vector u(N, 2);
+    VectorExpr::Vector v(N, 3);
+    auto start2 = std::chrono::system_clock::now();
+    VectorExpr::Vector z = u/v + v/u + u*u - v*v + u*v;
+    for (size_t i = 0; i < z.size(); i++) {
+        std::cout<<z[i]<<" ";
+    }
+    auto end2 =  std::chrono::system_clock::now();
+    auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
+    double t2 = (double(duration2.count()) *
+                         std::chrono::microseconds::period::num /
+                         std::chrono::microseconds::period::den);
+    std::cout<<std::endl;
+    std::cout<<"vector cost:"<<t1<<"s"<<std::endl;
+    std::cout<<"vecotor expression cost:"<<t2<<"s"<<std::endl;
     return 0;
 }

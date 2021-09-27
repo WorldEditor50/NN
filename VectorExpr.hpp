@@ -2,8 +2,10 @@
 #define VECTOREXPR_HPP
 #include "allocator.hpp"
 #include <iostream>
+#include <tuple>
+#include <cmath>
 
-namespace VectorExp {
+namespace VectorExpr {
 
 using T = double;
 /* scalar */
@@ -18,15 +20,15 @@ public:
     inline size_t size() const {return 0;}
 };
 
-template <typename TExpr>
-class VectorExpr
+template <typename TExprImpl>
+class Expr
 {
 public:
-    inline T operator[](size_t i) const {return static_cast<TExpr const &>(*this)[i];}
-    inline TExpr const & value() const {return static_cast<TExpr const &>(*this);}
+    inline const TExprImpl& impl() const {return static_cast<const TExprImpl&>(*this);}
+    inline size_t size() const {return static_cast<const TExprImpl&>(*this).size();}
 };
 
-class Vector : public VectorExpr<Vector>
+class Vector : public Expr<Vector>
 {
 private:
     static Allocator<T> allocator;
@@ -60,20 +62,18 @@ public:
         r.ptr = nullptr;
         r.size_ = 0;
     }
-    template <typename TRight>
-    Vector(VectorExpr<TRight> const &expr)
+    template<typename TExpr>
+    Vector(const Expr<TExpr> &r)
     {
-        TRight const &r = expr.value();
-        ptr = allocator.allocate(r.size_);
-        size_ = r.size_;
+        const TExpr& expr = r.impl();
+        ptr = allocator.allocate(expr.size());
+        size_ = expr.size();
         for (int i = 0; i < size_; i++) {
-            ptr[i] = r.ptr[i];
+            ptr[i] = expr[i];
         }
     }
-    template <typename TRight>
-    Vector& operator = (VectorExpr<TRight> const &expr)
+    Vector& operator = (const Vector &r)
     {
-        TRight const & r = expr.value();
         if (this == &r) {
             return *this;
         }
@@ -87,10 +87,8 @@ public:
         }
         return *this;
     }
-    template <typename TRight>
-    Vector& operator = (VectorExpr<TRight> &&expr)
+    Vector& operator = (Vector &&r)
     {
-        TRight const & r = expr.value();
         if (this == &r) {
             return *this;
         }
@@ -100,6 +98,18 @@ public:
         r.size_ = 0;
         return *this;
     }
+
+    template<typename TExpr>
+    Vector& operator = (const Expr<TExpr> &r)
+    {
+        const TExpr& vec = r.impl();
+        ptr = allocator.allocate(vec.size_);
+        size_ = vec.size_;
+        for (int i = 0; i < size_; i++) {
+            ptr[i] = r.ptr[i];
+        }
+    }
+
     void show()
     {
         for (int i = 0; i < size_; i++) {
@@ -112,206 +122,200 @@ public:
 };
 Allocator<T> Vector::allocator;
 /* trait */
-template<typename T>
-class VectorTrait
+template<typename TRef>
+class Trait
 {
 public:
-    using ExpRef = T const&;
+    using ExpRef = const TRef&;
 };
 
-template<typename T>
-class VectorTrait<Scalar<T> >
+template<typename TRef>
+class Trait<Scalar<TRef> >
 {
 public:
-    using ExpRef = Scalar<T>;
+    using ExpRef = Scalar<TRef>;
 };
 
-/* vector operation */
-template<typename TLeft, typename TRight>
-class VectorPlus : public VectorExpr<VectorPlus<TLeft, TRight> >
+/* vector operator */
+template<typename TOperator, typename TLeft, typename TRight>
+class BinaryOperator : public Expr<BinaryOperator<TOperator, TLeft, TRight> >
 {
 public:
-    explicit VectorPlus(VectorExpr<TLeft> const &left_, VectorExpr<TRight> const &right_):left(left_), right(right_){}
-    inline T operator[](size_t i) const {return left[i] + right[i];}
+    explicit BinaryOperator(const Expr<TLeft> &left_, const Expr<TRight> &right_):
+        left(left_.impl()), right(right_.impl()){}
+    inline T operator[](size_t i) const {return TOperator::apply(left[i], right[i]);}
+    inline size_t size() const {return left.size();}
 private:
-    TLeft const &left;
-    TRight const &right;
+    const TLeft &left;
+    const TRight &right;
 };
-
-template<typename TLeft, typename TRight>
-class VectorMinus : public VectorExpr<VectorMinus<TLeft, TRight> >
+template<typename TOperator, typename TRight>
+class UnaryOperator : public Expr<UnaryOperator<TOperator, TRight> >
 {
 public:
-    explicit VectorMinus(VectorExpr<TLeft> const &left_, VectorExpr<TRight> const &right_):left(left_), right(right_){}
-    inline T operator[](size_t i) const {return left[i] - right[i];}
+    explicit UnaryOperator(const Expr<TRight> &right_):right(right_.impl()){}
+    inline T operator[](size_t i) const {return TOperator::apply(right[i]);}
+    inline size_t size() const {return right.size();}
 private:
-    TLeft const &left;
-    TRight const & right;
+    const TRight &right;
 };
-
-template<typename TLeft, typename TRight>
-class VectorMulti : public VectorExpr<VectorMulti<TLeft, TRight> >
+template<typename TOperator, typename ...TArgs>
+class MultiOperator : public Expr<MultiOperator<TOperator, TArgs...> >
 {
 public:
-    explicit VectorMulti(VectorExpr<TLeft> const &left_, VectorExpr<TRight> const &right_):left(left_), right(right_){}
-    inline T operator[](size_t i) const {return left[i] * right[i];}
+    explicit MultiOperator(const Expr<TArgs>& ...args_):args(args_.impl()...){}
 private:
-    TLeft const &left;
-    TRight const & right;
+    std::tuple<const TArgs&...> args;
 };
-
-template<typename TLeft, typename TRight>
-class VectorDivide : public VectorExpr<VectorDivide<TLeft, TRight> >
+/* basic operation */
+class Plus
 {
 public:
-    explicit VectorDivide(VectorExpr<TLeft> const &left_, VectorExpr<TRight> const &right_):left(left_), right(right_){}
-    inline T operator[](size_t i) const {return left[i] / right[i];}
-private:
-    TLeft const &left;
-    TRight const & right;
+    inline static T apply(T x1, T x2) {return x1 + x2;};
+};
+
+class Minus
+{
+public:
+    inline static T apply(T x1, T x2) {return x1 - x2;};
+};
+
+class Multi
+{
+public:
+    inline static T apply(T x1, T x2) {return x1 * x2;};
+};
+
+class Divide
+{
+public:
+    inline static T apply(T x1, T x2) {return x1 / x2;};
+};
+
+class Negative
+{
+public:
+    inline static T apply(T x) {return -x;};
+};
+/* function */
+class Pow
+{
+public:
+    inline static T apply(T x, T n) {return pow(x, n);};
+};
+
+class Sqrt
+{
+public:
+    inline static T apply(T x) {return sqrt(x);};
+};
+
+class Exp
+{
+public:
+    inline static T apply(T x) {return exp(x);};
+};
+
+class Tanh
+{
+public:
+    inline static T apply(T x) {return tanh(x);};
+};
+
+class Sigmoid
+{
+public:
+    inline static T apply(T x) {return exp(x) / (1 + exp(x));};
+};
+
+class Relu
+{
+public:
+    inline static T apply(T x) {return x > 0 ? x : 0;};
 };
 
 template<typename TLeft, typename TRight>
-VectorPlus<TLeft, TRight> operator + (VectorExpr<TLeft> const &left_, VectorExpr<TRight> const &right_)
+inline BinaryOperator<Plus, TLeft, TRight>
+operator + (const Expr<TLeft> &left_, const Expr<TRight> &right_)
 {
-    return VectorPlus<TLeft, TRight>(left_, right_);
+    return BinaryOperator<Plus, TLeft, TRight>(left_, right_);
 }
 
 template<typename TLeft, typename TRight>
-VectorMinus<TLeft, TRight> operator - (VectorExpr<TLeft> const &left_, VectorExpr<TRight> const &right_)
+inline BinaryOperator<Minus, TLeft, TRight>
+operator - (const Expr<TLeft> &left_, const Expr<TRight> &right_)
 {
-    return VectorMinus<TLeft, TRight>(left_, right_);
+    return BinaryOperator<Minus, TLeft, TRight>(left_, right_);
 }
 
 template<typename TLeft, typename TRight>
-VectorMulti<TLeft, TRight> operator * (VectorExpr<TLeft> const &left_, VectorExpr<TRight> const &right_)
+inline BinaryOperator<Multi, TLeft, TRight>
+operator * (const Expr<TLeft> &left_, const Expr<TRight> &right_)
 {
-    return VectorMulti<TLeft, TRight>(left_, right_);
+    return BinaryOperator<Multi, TLeft, TRight>(left_, right_);
 }
 
 template<typename TLeft, typename TRight>
-VectorDivide<TLeft, TRight> operator / (VectorExpr<TLeft> const &left_, VectorExpr<TRight> const &right_)
+inline BinaryOperator<Divide, TLeft, TRight>
+operator / (const Expr<TLeft> &left_, const Expr<TRight> &right_)
 {
-    return VectorDivide<TLeft, TRight>(left_, right_);
+    return BinaryOperator<Divide, TLeft, TRight>(left_, right_);
 }
 
-/* scale operation */
-template<typename TLeft>
-class VectorPlusScale : public VectorExpr<VectorPlusScale<TLeft> >
+
+T dot(const Vector &x1, const Vector &x2)
 {
-public:
-    explicit VectorPlusScale(const VectorExpr<TLeft> &left_, T right_):left(left_), right(right_){}
-    inline T operator[](size_t i) {return left[i] + right;}
-private:
-    TLeft& left;
-    T right;
-};
+    T s = 0;
+    auto z = x1 * x2;
+    for (size_t i = 0; i < x1.size(); i++) {
+        s += z[i];
+    }
+    return s;
+}
+
+/* negative */
 template<typename TRight>
-class ScalePlusVector : public VectorExpr<ScalePlusVector<TRight> >
+inline UnaryOperator<Negative, TRight>
+operator - (const Expr<TRight> &right)
 {
-public:
-    explicit ScalePlusVector(T left_, const VectorExpr<TRight> &right_):left(left_), right(right_){}
-    inline T operator[](size_t i) {return left + right[i];}
-private:
-    T left;
-    TRight& right;
-};
-
-template<typename TLeft>
-class VectorMinusScale : public VectorExpr<VectorMinusScale<TLeft> >
-{
-public:
-    explicit VectorMinusScale(const VectorExpr<TLeft> &left_, T right_):left(left_), right(right_){}
-    inline T operator[](size_t i) {return left[i] - right;}
-private:
-    TLeft& left;
-    T right;
-};
-template<typename TRight>
-class ScaleMinusVector : public VectorExpr<ScaleMinusVector<TRight> >
-{
-public:
-    explicit ScaleMinusVector(T left_, const VectorExpr<TRight> &right_):left(left_), right(right_){}
-    inline T operator[](size_t i) {return left - right[i];}
-private:
-    T left;
-    TRight& right;
-};
-
-template<typename TLeft>
-class VectorMultiScale : public VectorExpr<VectorMultiScale<TLeft> >
-{
-public:
-    explicit VectorMultiScale(const VectorExpr<TLeft> &left_, T right_):left(left_), right(right_){}
-    inline T operator[](size_t i) {return left[i] * right;}
-private:
-    TLeft& left;
-    T right;
-};
-template<typename TRight>
-class ScaleMultiVector: public VectorExpr<ScaleMultiVector<TRight> >
-{
-public:
-    explicit ScaleMultiVector(T left_, const VectorExpr<TRight> &right_):left(left_), right(right_){}
-    inline T operator[](size_t i) {return left * right[i];}
-private:
-    T left;
-    TRight& right;
-};
-
-template<typename TLeft>
-class VectorDivideScale : public VectorExpr<VectorDivideScale<TLeft> >
-{
-public:
-    explicit VectorDivideScale(const VectorExpr<TLeft> &left_, T right_):left(left_), right(right_){}
-    inline T operator[](size_t i) {return left[i] / right;}
-private:
-    TLeft& left;
-    T right;
-};
-
-template<typename TLeft>
-VectorPlusScale<TLeft> operator + (const VectorExpr<TLeft> &left_, T right_)
-{
-    return VectorPlusScale<TLeft>(left_, right_);
+    return UnaryOperator<Negative, TRight>(right);
 }
 
-template<typename TRight>
-ScalePlusVector<TRight> operator + (T left_, const VectorExpr<TRight> &right_)
+template<typename TExpr>
+inline UnaryOperator<Sqrt, TExpr>
+SQRT(const Expr<TExpr> &expr)
 {
-    return ScalePlusVector<TRight>(left_, right_);
+    return UnaryOperator<Sqrt, TExpr>(expr);
 }
 
-template<typename TLeft>
-VectorMinusScale<TLeft> operator - (const VectorExpr<TLeft> &left_, T right_)
+template<typename TExpr>
+inline UnaryOperator<Exp, TExpr>
+EXP(const Expr<TExpr> &expr)
 {
-    return VectorMinusScale<TLeft>(left_, right_);
+    return UnaryOperator<Exp, TExpr>(expr);
 }
 
-template<typename TRight>
-ScaleMinusVector<TRight> operator - (T left_, const VectorExpr<TRight> &right_)
+template<typename TExpr>
+inline UnaryOperator<Tanh, TExpr>
+TANH(const Expr<TExpr> &expr)
 {
-    return ScaleMinusVector<TRight>(left_, right_);
+    return UnaryOperator<Tanh, TExpr>(expr);
 }
 
-
-template<typename TLeft>
-VectorMultiScale<TLeft> operator * (const VectorExpr<TLeft> &left_, T right_)
+template<typename TExpr>
+inline UnaryOperator<Sigmoid, TExpr>
+SIGMOID(const Expr<TExpr> &expr)
 {
-    return VectorMultiScale<TLeft>(left_, right_);
+    return UnaryOperator<Sigmoid, TExpr>(expr);
 }
 
-template<typename TRight>
-ScaleMultiVector<TRight> operator * (T left_, const VectorExpr<TRight> &right_)
+template<typename TExpr>
+inline UnaryOperator<Relu, TExpr>
+RELU(const Expr<TExpr> &expr)
 {
-    return ScaleMultiVector<TRight>(left_, right_);
+    return UnaryOperator<Relu, TExpr>(expr);
 }
 
-template<typename TLeft>
-VectorDivideScale<TLeft> operator / (const VectorExpr<TLeft> &left_, T right_)
-{
-    return VectorDivideScale<TLeft>(left_, right_);
-}
 
 }
 #endif // VECTOREXPR_HPP

@@ -31,3 +31,5 @@ HEADERS += \
     lstm.hpp \
     matrix.hpp \
     mlp.hpp
+
+#QMAKE_CXXFLAGS = -O3
