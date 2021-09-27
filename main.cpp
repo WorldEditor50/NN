@@ -199,11 +199,12 @@ int main()
     /* expression */
 //    Exp::Var x;
 //    evaluate(x * x - x + Exp::Const(2));
-    size_t N = 1000000;
+    size_t N = 10;
     Vector<double> x1(N, 5);
     Vector<double> x2(N, 7);
     auto start = std::chrono::system_clock::now();
-    auto x3 = x1/x2  + x2/x1 + x1 * x1 - x2*x2 + x1 * x2;
+    //auto x3 = x1/x2  + x2/x1 + x1 * x1 - x2*x2 + x1 * x2;
+    auto x3 = x1*5 + x2/7 + 12;
     x3.show();
     auto end = std::chrono::system_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
@@ -214,7 +215,10 @@ int main()
     VectorExpr::Vector u(N, 2);
     VectorExpr::Vector v(N, 3);
     auto start2 = std::chrono::system_clock::now();
-    VectorExpr::Vector z = u/v + v/u + u*u - v*v + u*v;
+    //VectorExpr::Vector z = u/v + v/u + u*u - v*v + u*v;
+    //double s = VectorExpr::dot(u, v);
+    //std::cout<<"dot:"<<s<<std::endl;
+    auto z = u*2 + v/3 + 8;
     for (size_t i = 0; i < z.size(); i++) {
         std::cout<<z[i]<<" ";
     }

@@ -2,23 +2,12 @@
 #define VECTOREXPR_HPP
 #include "allocator.hpp"
 #include <iostream>
-#include <tuple>
 #include <cmath>
+#include <type_traits>
 
 namespace VectorExpr {
 
 using T = double;
-/* scalar */
-template<typename T>
-class Scalar
-{
-public:
-    T const &s;
-public:
-    Scalar(T const &s_):s(s_){}
-    inline T operator[](size_t) const {return s;}
-    inline size_t size() const {return 0;}
-};
 
 template <typename TExprImpl>
 class Expr
@@ -26,6 +15,17 @@ class Expr
 public:
     inline const TExprImpl& impl() const {return static_cast<const TExprImpl&>(*this);}
     inline size_t size() const {return static_cast<const TExprImpl&>(*this).size();}
+};
+
+/* scalar */
+class Scalar : public Expr<Scalar>
+{
+public:
+    T s;
+public:
+    Scalar(const T &s_):s(s_){}
+    inline T operator[](size_t) const {return s;}
+    inline size_t size() const {return 0;}
 };
 
 class Vector : public Expr<Vector>
@@ -41,7 +41,7 @@ public:
     explicit Vector(size_t N):ptr(allocator.allocate(N)), size_(N){}
     explicit Vector(size_t N, T x):ptr(allocator.allocate(N)), size_(N)
     {
-        for (int i = 0; i < size_; i++) {
+        for (size_t i = 0; i < size_; i++) {
             ptr[i] = x;
         }
     }
@@ -53,7 +53,7 @@ public:
     }
     Vector(const Vector &r):ptr(allocator.allocate(r.size_)), size_(r.size_)
     {
-        for (int i = 0; i < size_; i++) {
+        for (size_t i = 0; i < size_; i++) {
             ptr[i] = r.ptr[i];
         }
     }
@@ -68,7 +68,7 @@ public:
         const TExpr& expr = r.impl();
         ptr = allocator.allocate(expr.size());
         size_ = expr.size();
-        for (int i = 0; i < size_; i++) {
+        for (size_t i = 0; i < size_; i++) {
             ptr[i] = expr[i];
         }
     }
@@ -82,7 +82,7 @@ public:
             ptr = allocator.allocate(r.size_);
             size_ = r.size_;
         }
-        for (int i = 0; i < size_; i++) {
+        for (size_t i = 0; i < size_; i++) {
             ptr[i] = r.ptr[i];
         }
         return *this;
@@ -92,6 +92,7 @@ public:
         if (this == &r) {
             return *this;
         }
+        allocator.deallocate(size_, ptr);
         ptr = r.ptr;
         size_ = r.size_;
         r.ptr = nullptr;
@@ -102,17 +103,18 @@ public:
     template<typename TExpr>
     Vector& operator = (const Expr<TExpr> &r)
     {
-        const TExpr& vec = r.impl();
-        ptr = allocator.allocate(vec.size_);
-        size_ = vec.size_;
-        for (int i = 0; i < size_; i++) {
-            ptr[i] = r.ptr[i];
+        const TExpr& expr = r.impl();
+        ptr = allocator.allocate(expr.size());
+        size_ = expr.size();
+        for (size_t i = 0; i < size_; i++) {
+            ptr[i] = expr[i];
         }
+        return *this;
     }
 
     void show()
     {
-        for (int i = 0; i < size_; i++) {
+        for (size_t i = 0; i < size_; i++) {
             std::cout<<ptr[i]<<" ";
         }
         std::cout<<std::endl;
@@ -122,18 +124,13 @@ public:
 };
 Allocator<T> Vector::allocator;
 /* trait */
-template<typename TRef>
+template<typename TExpr>
 class Trait
 {
 public:
-    using ExpRef = const TRef&;
-};
-
-template<typename TRef>
-class Trait<Scalar<TRef> >
-{
-public:
-    using ExpRef = Scalar<TRef>;
+    using Type = typename std::conditional<std::is_same<Scalar, TExpr>::value,
+                                           Scalar,
+                                           const TExpr&>::type;
 };
 
 /* vector operator */
@@ -145,9 +142,9 @@ public:
         left(left_.impl()), right(right_.impl()){}
     inline T operator[](size_t i) const {return TOperator::apply(left[i], right[i]);}
     inline size_t size() const {return left.size();}
-private:
-    const TLeft &left;
-    const TRight &right;
+protected:
+    typename Trait<TLeft>::Type left;
+    typename Trait<TRight>::Type right;
 };
 template<typename TOperator, typename TRight>
 class UnaryOperator : public Expr<UnaryOperator<TOperator, TRight> >
@@ -156,81 +153,52 @@ public:
     explicit UnaryOperator(const Expr<TRight> &right_):right(right_.impl()){}
     inline T operator[](size_t i) const {return TOperator::apply(right[i]);}
     inline size_t size() const {return right.size();}
-private:
+protected:
     const TRight &right;
 };
-template<typename TOperator, typename ...TArgs>
-class MultiOperator : public Expr<MultiOperator<TOperator, TArgs...> >
-{
-public:
-    explicit MultiOperator(const Expr<TArgs>& ...args_):args(args_.impl()...){}
-private:
-    std::tuple<const TArgs&...> args;
-};
+
 /* basic operation */
-class Plus
-{
-public:
+struct Plus {
     inline static T apply(T x1, T x2) {return x1 + x2;};
 };
 
-class Minus
-{
-public:
+struct Minus {
     inline static T apply(T x1, T x2) {return x1 - x2;};
 };
 
-class Multi
-{
-public:
+struct Multi {
     inline static T apply(T x1, T x2) {return x1 * x2;};
 };
 
-class Divide
-{
-public:
+struct Divide {
     inline static T apply(T x1, T x2) {return x1 / x2;};
 };
 
-class Negative
-{
-public:
+struct Negative {
     inline static T apply(T x) {return -x;};
 };
 /* function */
-class Pow
-{
-public:
+struct Pow {
     inline static T apply(T x, T n) {return pow(x, n);};
 };
 
-class Sqrt
-{
-public:
+struct Sqrt {
     inline static T apply(T x) {return sqrt(x);};
 };
 
-class Exp
-{
-public:
+struct Exp {
     inline static T apply(T x) {return exp(x);};
 };
 
-class Tanh
-{
-public:
+struct Tanh {
     inline static T apply(T x) {return tanh(x);};
 };
 
-class Sigmoid
-{
-public:
+struct Sigmoid {
     inline static T apply(T x) {return exp(x) / (1 + exp(x));};
 };
 
-class Relu
-{
-public:
+struct Relu {
     inline static T apply(T x) {return x > 0 ? x : 0;};
 };
 
@@ -240,12 +208,25 @@ operator + (const Expr<TLeft> &left_, const Expr<TRight> &right_)
 {
     return BinaryOperator<Plus, TLeft, TRight>(left_, right_);
 }
+template<typename TLeft>
+inline BinaryOperator<Plus, TLeft, Scalar>
+operator + (const Expr<TLeft> &left_, T right_)
+{
+    return BinaryOperator<Plus, TLeft, Scalar>(left_, Scalar(right_));
+}
 
 template<typename TLeft, typename TRight>
 inline BinaryOperator<Minus, TLeft, TRight>
 operator - (const Expr<TLeft> &left_, const Expr<TRight> &right_)
 {
     return BinaryOperator<Minus, TLeft, TRight>(left_, right_);
+}
+
+template<typename TLeft>
+inline BinaryOperator<Minus, TLeft, Scalar>
+operator - (const Expr<TLeft> &left_, T right_)
+{
+    return BinaryOperator<Minus, TLeft, Scalar>(left_, Scalar(right_));
 }
 
 template<typename TLeft, typename TRight>
@@ -255,6 +236,13 @@ operator * (const Expr<TLeft> &left_, const Expr<TRight> &right_)
     return BinaryOperator<Multi, TLeft, TRight>(left_, right_);
 }
 
+template<typename TLeft>
+inline BinaryOperator<Multi, TLeft, Scalar>
+operator * (const Expr<TLeft> &left_, T right_)
+{
+    return BinaryOperator<Multi, TLeft, Scalar>(left_, Scalar(right_));
+}
+
 template<typename TLeft, typename TRight>
 inline BinaryOperator<Divide, TLeft, TRight>
 operator / (const Expr<TLeft> &left_, const Expr<TRight> &right_)
@@ -262,6 +250,12 @@ operator / (const Expr<TLeft> &left_, const Expr<TRight> &right_)
     return BinaryOperator<Divide, TLeft, TRight>(left_, right_);
 }
 
+template<typename TLeft>
+inline BinaryOperator<Divide, TLeft, Scalar>
+operator / (const Expr<TLeft> &left_, T right_)
+{
+    return BinaryOperator<Divide, TLeft, Scalar>(left_, Scalar(right_));
+}
 
 T dot(const Vector &x1, const Vector &x2)
 {
