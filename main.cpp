@@ -192,6 +192,13 @@ void evaluate(const Exp::Expr<TExpr> &f)
     std::cout<<std::endl;
     return;
 }
+struct Show {
+    inline static void apply(double x)
+    {
+        std::cout<<x<<" ";
+    }
+};
+
 int main()
 {
     srand((unsigned int)time(nullptr));
@@ -199,7 +206,7 @@ int main()
     /* expression */
 //    Exp::Var x;
 //    evaluate(x * x - x + Exp::Const(2));
-    size_t N = 10;
+    const size_t N = 10;
     Vector<double> x1(N, 5);
     Vector<double> x2(N, 7);
     auto start = std::chrono::system_clock::now();
@@ -214,14 +221,12 @@ int main()
 
     VectorExpr::Vector u(N, 2);
     VectorExpr::Vector v(N, 3);
+    double s = VectorExpr::Dot<N - 1>::_(u, v);
+    std::cout<<"dot product:"<<s<<std::endl;
     auto start2 = std::chrono::system_clock::now();
     //VectorExpr::Vector z = u/v + v/u + u*u - v*v + u*v;
-    //double s = VectorExpr::dot(u, v);
-    //std::cout<<"dot:"<<s<<std::endl;
-    auto z = u*2 + v/3 + 8;
-    for (size_t i = 0; i < z.size(); i++) {
-        std::cout<<z[i]<<" ";
-    }
+    VectorExpr::Vector z = u*2 + v/3 + 8;
+    VectorExpr::evaluate<Show, N - 1>::_(z);
     auto end2 =  std::chrono::system_clock::now();
     auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
     double t2 = (double(duration2.count()) *

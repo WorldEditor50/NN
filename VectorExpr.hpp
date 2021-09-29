@@ -20,22 +20,24 @@ public:
 /* scalar */
 class Scalar : public Expr<Scalar>
 {
-public:
+protected:
     T s;
 public:
     Scalar(const T &s_):s(s_){}
+    Scalar(const Scalar &r):s(r.s){}
     inline T operator[](size_t) const {return s;}
     inline size_t size() const {return 0;}
 };
-
+/* Vector */
 class Vector : public Expr<Vector>
 {
-private:
+protected:
     static Allocator<T> allocator;
     T *ptr;
     size_t size_;
 public:
     inline T operator[](size_t i) const {return ptr[i];}
+    inline T& at(size_t i) const {return ptr[i];}
     inline size_t size() const {return size_;}
     Vector():ptr(nullptr), size_(0){}
     explicit Vector(size_t N):ptr(allocator.allocate(N)), size_(N){}
@@ -104,6 +106,7 @@ public:
     Vector& operator = (const Expr<TExpr> &r)
     {
         const TExpr& expr = r.impl();
+        allocator.deallocate(size_, ptr);
         ptr = allocator.allocate(expr.size());
         size_ = expr.size();
         for (size_t i = 0; i < size_; i++) {
@@ -141,6 +144,7 @@ public:
     explicit BinaryOperator(const Expr<TLeft> &left_, const Expr<TRight> &right_):
         left(left_.impl()), right(right_.impl()){}
     inline T operator[](size_t i) const {return TOperator::apply(left[i], right[i]);}
+    inline T& at(size_t i) const {return TOperator::apply(left[i], right[i]);}
     inline size_t size() const {return left.size();}
 protected:
     typename Trait<TLeft>::Type left;
@@ -152,6 +156,7 @@ class UnaryOperator : public Expr<UnaryOperator<TOperator, TRight> >
 public:
     explicit UnaryOperator(const Expr<TRight> &right_):right(right_.impl()){}
     inline T operator[](size_t i) const {return TOperator::apply(right[i]);}
+    inline T& at(size_t i) const {return TOperator::apply(right[i]);}
     inline size_t size() const {return right.size();}
 protected:
     const TRight &right;
@@ -256,16 +261,44 @@ operator / (const Expr<TLeft> &left_, T right_)
 {
     return BinaryOperator<Divide, TLeft, Scalar>(left_, Scalar(right_));
 }
-
-T dot(const Vector &x1, const Vector &x2)
+/* evaluate */
+template<typename TOperator, size_t N>
+struct evaluate
 {
-    T s = 0;
-    auto z = x1 * x2;
-    for (size_t i = 0; i < x1.size(); i++) {
-        s += z[i];
+    inline static void _(const Vector &x)
+    {
+        TOperator::apply(x[N]);
+        return evaluate<TOperator, N - 1>::_(x);
     }
-    return s;
-}
+    inline static void __(const Vector &x1, const Vector &x2)
+    {
+        TOperator::apply(x1[N], x2[N]);
+        return evaluate<TOperator, N - 1>::__(x1, x2);
+    }
+};
+template<typename TOperator>
+struct evaluate<TOperator, 0>
+{
+    inline static void _(const Vector &x){TOperator::apply(x[0]);}
+    inline static void __(const Vector &x1, const Vector &x2)
+    {
+        return TOperator::apply(x1[0], x2[0]);
+    }
+};
+template<size_t N>
+struct Dot
+{
+    inline static T _(const Vector &x1, const Vector &x2)
+    {
+        return x1[N] * x2[N] + Dot<N - 1>::_(x1, x2);
+    }
+};
+
+template<>
+struct Dot<0>
+{
+    inline static T _(const Vector &x1, const Vector &x2){return x1[0] * x2[0];}
+};
 
 /* negative */
 template<typename TRight>
