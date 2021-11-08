@@ -397,7 +397,7 @@ public:
         return *this;
     }
 
-    Mat Tr()
+    Mat Tr() const
     {
         Mat y(cols,rows);
         for (int i = 0; i < rows; i++) {

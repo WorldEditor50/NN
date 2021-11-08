@@ -26,7 +26,7 @@ public:
     Scalar(const T &s_):s(s_){}
     Scalar(const Scalar &r):s(r.s){}
     inline T operator[](size_t) const {return s;}
-    inline size_t size() const {return 0;}
+    inline size_t size() const {return 1;}
 };
 /* Vector */
 class Vector : public Expr<Vector>

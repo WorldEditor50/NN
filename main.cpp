@@ -5,7 +5,7 @@
 #include "VectorExpr.hpp"
 #include <chrono>
 
-using namespace lstm;
+using namespace ML;
 
 void test_DAG()
 {
@@ -132,57 +132,6 @@ void test_xor()
     return;
 }
 
-std::vector<Mat<double> > int2Sequence(int x1, int x2)
-{
-    std::vector<Mat<double> > seq;
-    for (int i = 0; i < 16; i++) {
-        seq.push_back(Mat<double>(1, 1));
-    }
-    for (int i = 0; i < 8; i++) {
-        seq[i][0][0] = 0x01 & x1;
-        x1 >>= 1;
-    }
-    for (int i = 8; i < 16; i++) {
-        seq[i][0][0] = 0x01 & x2;
-        x2 >>= 1;
-    }
-    return seq;
-}
-
-std::vector<Mat<double> > int2Sequence(int x)
-{
-    std::vector<Mat<double> > seq;
-    for (int i = 0; i < 8; i++) {
-        seq.push_back(Mat<double>(1, 1));
-    }
-    for (int i = 0; i < 8; i++) {
-        seq[i][0][0] = 0x01 & x;
-        x >>= 1;
-    }
-    return seq;
-}
-
-void test_lstm()
-{
-    LSTM<1, 8, 1> guess;
-    for (int epoch = 0; epoch < 10; epoch++) {
-        int a = rand() % 128;
-        int b = rand() % 128;
-        int c = a + b;
-        std::vector<Mat<double> > seq = int2Sequence(a, b);
-        std::vector<Mat<double> > y = int2Sequence(c);
-        guess.forward(seq);
-        guess.gradient(seq, y);
-        guess.SGD(0.01);
-        int d = 0;
-        for (auto &p : guess.states) {
-            d += p.y[0][0];
-        }
-        std::cout<<a<<" + "<<b<<" = "<<d<<std::endl;
-        guess.states.clear();
-    }
-    return;
-}
 template <typename TExpr>
 void evaluate(const Exp::Expr<TExpr> &f)
 {
@@ -198,10 +147,8 @@ struct Show {
         std::cout<<x<<" ";
     }
 };
-
-int main()
+void testVectorExpr()
 {
-    srand((unsigned int)time(nullptr));
     //test_xor();
     /* expression */
 //    Exp::Var x;
@@ -235,5 +182,61 @@ int main()
     std::cout<<std::endl;
     std::cout<<"vector cost:"<<t1<<"s"<<std::endl;
     std::cout<<"vecotor expression cost:"<<t2<<"s"<<std::endl;
+}
+
+void test_lstm()
+{
+    auto zeta = [](double x, double y) ->double {
+        return sin(x*x + y*y);
+    };
+    using Lstm = LSTM<2, 4, 1>;
+    Lstm lstm;
+    std::vector<Mat<double> > data;
+    std::vector<Mat<double> > target;
+    for (int i = 0; i < 1000; i++) {
+        Mat<double> p(2, 1);
+        double x = double(rand() % 1000) / 1000;
+        double y = double(rand() % 1000) / 1000;
+        double z = zeta(x, y);
+        p[0][0] = x;
+        p[0][1] = y;
+        Mat<double> q(1, 1);
+        q[0][0] = z;
+        data.push_back(p);
+        target.push_back(q);
+    }
+    auto sample = [&](std::vector<Mat<double> > &batchData,
+            std::vector<Mat<double> > &batchTarget, int batchSize){
+        for (int i = 0; i < batchSize; i++) {
+            int k = rand() % data.size();
+            batchData.push_back(data[k]);
+            batchTarget.push_back(target[k]);
+        }
+    };
+    for (int i = 0; i < 1000; i++) {
+        std::vector<Mat<double> > batchData;
+        std::vector<Mat<double> > batchTarget;
+        sample(batchData, batchTarget, 32);
+        lstm.forward(batchData);
+        lstm.gradient(batchData, batchTarget);
+        lstm.RMSProp(0.9, 0.01);
+    }
+    for (int i = 0; i < 10; i++) {
+        Mat<double> p(2, 1);
+        double x = double(rand() % 1000) / 1000;
+        double y = double(rand() % 1000) / 1000;
+        double z = zeta(x, y);
+        p[0][0] = x;
+        p[0][1] = y;
+        std::cout<<"x = "<<x<<" y = "<<y<<" z = "<<z<<std::endl;
+        std::cout<<"predict:"<<std::endl;
+        lstm.feedForward(p).show();
+    }
+    return;
+}
+int main()
+{
+    srand((unsigned int)time(nullptr));
+    test_lstm();
     return 0;
 }

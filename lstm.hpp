@@ -1,53 +1,51 @@
 #ifndef LSTM_HPP
 #define LSTM_HPP
 #include "matrix.hpp"
-using namespace ML;
-
-namespace lstm {
-
-template <typename DataType, int inputDim, int hiddenDim, int outputDim>
+namespace ML {
+using T = double;
+template <int inputDim, int hiddenDim, int outputDim>
 class CellParam
 {
 public:
     /* forget gate */
-    Mat<DataType> Wf;
-    Mat<DataType> Uf;
-    Mat<DataType> Bf;
+    Mat<T> Wf;
+    Mat<T> Uf;
+    Mat<T> Bf;
     /* input gate */
-    Mat<DataType> Wi;
-    Mat<DataType> Ui;
-    Mat<DataType> Bi;
-    Mat<DataType> Wa;
-    Mat<DataType> Ua;
-    Mat<DataType> Ba;
+    Mat<T> Wi;
+    Mat<T> Ui;
+    Mat<T> Bi;
+    Mat<T> Wg;
+    Mat<T> Ug;
+    Mat<T> Bg;
     /* output gate */
-    Mat<DataType> Wo;
-    Mat<DataType> Uo;
-    Mat<DataType> Bo;
+    Mat<T> Wo;
+    Mat<T> Uo;
+    Mat<T> Bo;
     /* output */
-    Mat<DataType> Wp;
-    Mat<DataType> Bp;
+    Mat<T> Wp;
+    Mat<T> Bp;
 public:
     CellParam()
     {
         /* forget gate */
-        Wf = Mat<DataType>(hiddenDim, inputDim);
-        Uf = Mat<DataType>(hiddenDim, hiddenDim);
-        Bf = Mat<DataType>(hiddenDim, 1);
+        Wf = Mat<T>(hiddenDim, inputDim);
+        Uf = Mat<T>(hiddenDim, hiddenDim);
+        Bf = Mat<T>(hiddenDim, 1);
         /* input gate */
-        Wi = Mat<DataType>(hiddenDim, inputDim);
-        Ui = Mat<DataType>(hiddenDim, hiddenDim);
-        Bi = Mat<DataType>(hiddenDim, 1);
-        Wa = Mat<DataType>(hiddenDim, inputDim);
-        Ua = Mat<DataType>(hiddenDim, hiddenDim);
-        Ba = Mat<DataType>(hiddenDim, 1);
+        Wi = Mat<T>(hiddenDim, inputDim);
+        Ui = Mat<T>(hiddenDim, hiddenDim);
+        Bi = Mat<T>(hiddenDim, 1);
+        Wg = Mat<T>(hiddenDim, inputDim);
+        Ug = Mat<T>(hiddenDim, hiddenDim);
+        Bg = Mat<T>(hiddenDim, 1);
         /* output gate */
-        Wo = Mat<DataType>(hiddenDim, inputDim);
-        Uo = Mat<DataType>(hiddenDim, hiddenDim);
-        Bo = Mat<DataType>(hiddenDim, 1);
+        Wo = Mat<T>(hiddenDim, inputDim);
+        Uo = Mat<T>(hiddenDim, hiddenDim);
+        Bo = Mat<T>(hiddenDim, 1);
         /* output */
-        Wp = Mat<DataType>(outputDim, hiddenDim);
-        Bp = Mat<DataType>(outputDim, 1);
+        Wp = Mat<T>(outputDim, hiddenDim);
+        Bp = Mat<T>(outputDim, 1);
     }
     void zero()
     {
@@ -57,9 +55,9 @@ public:
         Wi.zero();
         Ui.zero();
         Bi.zero();
-        Wa.zero();
-        Ua.zero();
-        Ba.zero();
+        Wg.zero();
+        Ug.zero();
+        Bg.zero();
         Wo.zero();
         Uo.zero();
         Bo.zero();
@@ -72,67 +70,71 @@ public:
         Wi.uniformRandom();
         Ui.uniformRandom();
         Bi.uniformRandom();
-        Wa.uniformRandom();
-        Ua.uniformRandom();
-        Ba.uniformRandom();
+        Wg.uniformRandom();
+        Ug.uniformRandom();
+        Bg.uniformRandom();
         Wo.uniformRandom();
         Uo.uniformRandom();
         Bo.uniformRandom();
     }
 };
 
-template <typename DataType, int hiddenDim, int outputDim>
+template <int hiddenDim, int outputDim>
 class CellState
 {
 public:
     /* forget gate */
-    Mat<DataType> f;
+    Mat<T> f;
     /* input gate */
-    Mat<DataType> i;
-    Mat<DataType> a;
+    Mat<T> i;
+    Mat<T> g;
     /* output gate */
-    Mat<DataType> o;
+    Mat<T> o;
     /* cell state */
-    Mat<DataType> s;
+    Mat<T> c;
     /* hiddien output */
-    Mat<DataType> h;
+    Mat<T> h;
     /* output */
-    Mat<DataType> y;
+    Mat<T> y;
 public:
     CellState()
     {
-        f = Mat<DataType>(hiddenDim, 1);
-        i = Mat<DataType>(hiddenDim, 1);
-        a = Mat<DataType>(hiddenDim, 1);
-        o = Mat<DataType>(hiddenDim, 1);
-        s = Mat<DataType>(hiddenDim, 1);
-        h = Mat<DataType>(hiddenDim, 1);
-        y = Mat<DataType>(outputDim, 1);
+        f = Mat<T>(hiddenDim, 1);
+        i = Mat<T>(hiddenDim, 1);
+        g = Mat<T>(hiddenDim, 1);
+        o = Mat<T>(hiddenDim, 1);
+        c = Mat<T>(hiddenDim, 1);
+        h = Mat<T>(hiddenDim, 1);
+        y = Mat<T>(outputDim, 1);
     }
 
-    void copyFrom(const CellState &state)
-    {
-        f = state.f;
-        i = state.i;
-        a = state.a;
-        o = state.o;
-        s = state.s;
-        h = state.h;
-        y = state.y;
-    }
-
-    CellState(const CellState &state)
-    {
-        copyFrom(state);
-    }
+    CellState(const CellState &state):
+        f(state.f),i(state.i),g(state.g),
+        o(state.o),c(state.c),h(state.h),y(state.y){}
 
     CellState& operator = (const CellState &state)
     {
         if (this == &state) {
             return *this;
         }
-        copyFrom(state);
+        f = state.f;
+        i = state.i;
+        g = state.g;
+        o = state.o;
+        c = state.c;
+        h = state.h;
+        y = state.y;
         return *this;
+    }
+    void clear()
+    {
+        f.zero();
+        i.zero();
+        g.zero();
+        o.zero();
+        c.zero();
+        h.zero();
+        y.zero();
     }
 };
 
@@ -140,92 +142,118 @@ template <int inputDim, int hiddenDim, int outputDim>
 class LSTM
 {
 public:
-    using DataType = double;
-    using Param = CellParam<DataType, inputDim, hiddenDim, outputDim>;
-    using State = CellState<DataType, hiddenDim, outputDim>;
-    using SequenceIO = std::vector<Mat<DataType> >;
+    using Param = CellParam<inputDim, hiddenDim, outputDim>;
+    using State = CellState<hiddenDim, outputDim>;
 public:
-     Param param;
-     State state;
-     Param dParam;
+     Param P;
+     Param dP;
      Param Sp;
+     State state;
      State delta;
-     State delta_future;
+     State delta_;
      std::vector<State> states;
 public:
     LSTM()
     {
-        param.random();
+        P.random();
     }
 
-    Mat<DataType>& feedForward(const Mat<DataType> &x)
+    Mat<T>& feedForward(const Mat<T> &x)
     {
-        Mat<DataType> &h_ = state.h;
-        Mat<DataType> &s_ = state.s;
-        /* forget gate */
-        state.f = Sigmoid<DataType>::_(param.Wf * x + param.Uf * h_ + param.Bf);
+        /*
+                                                            y
+                                                            |
+                                                           h(t)
+                                              c(t)          |
+                c(t-1) -->--x-----------------+----------------->--- c(t)
+                            |                 |             |
+                            |                 |            tanh
+                            |                 |             |
+                            |          -------x      -------x
+                         f  |        i |      | g    | o    |
+                            |          |      |      |      |
+                         sigmoid    sigmoid  tanh  sigmoid  |
+                            |          |      |      |      |
+                h(t-1) -->----------------------------      ---->--- h(t)
+                            |
+                            x(t)
+
+            i = sigmoid(Wii*x + bii + Uhi*h + bhi);
+            f = sigmoid(Wif*x + bif + Uhf*h + bhf);
+            g = tanh(Wig*x + big + Uhg*h + bhg);
+            o = sigmoid(Wio*x + bio + Uho*h + bho);
+            f = sigmoid(Wif*x + bif + Uhf*h + bhf);
+            c' = f*c + i*g
+            h' = o*tanh(c')
+            y = sigmoid(W*h' + b)
+        */
         /* input gate */
-        state.i = Sigmoid<DataType>::_(param.Wi * x + param.Ui * h_ + param.Bi);
-        state.a = Tanh<DataType>::_(param.Wa * x + param.Ua * h_ + param.Ba);
-        /* cell state */
-        state.s = state.f % s_ +  state.i % state.a;
+        state.i = Sigmoid<T>::_(P.Wi * x + P.Ui * state.h + P.Bi);
+        /* forget gate */
+        state.f = Sigmoid<T>::_(P.Wf * x + P.Uf * state.h + P.Bf);
         /* output gate */
-        state.o = Sigmoid<DataType>::_(param.Wo * x + param.Uo * h_ + param.Bo);
-        state.h = state.o % Tanh<DataType>::_(state.s);
+        state.o = Sigmoid<T>::_(P.Wo * x + P.Uo * state.h + P.Bo);
+        state.g = Tanh<T>::_(P.Wg * x + P.Ug * state.h + P.Bg);
+        /* cell state */
+        state.c = state.f % state.c +  state.i % state.g;
+        state.h = state.o % Tanh<T>::_(state.c);
         /* predict */
-        state.y = Sigmoid<DataType>::_(param.Wp * state.h + param.Bp);
+        state.y = Sigmoid<T>::_(P.Wp * state.h + P.Bp);
         return state.y;
     }
 
-    void forward(const SequenceIO &seq)
+    void forward(const std::vector<Mat<T> > &seq)
     {
+        state.clear();
         for (auto &x : seq) {
-            feedForward(x);
-            /* save state */
             states.push_back(state);
+            feedForward(x);
         }
+        states.push_back(state);
         return;
     }
 
-    void gradient(SequenceIO &x, const SequenceIO &y)
+    void gradient(const std::vector<Mat<T> > &x, const std::vector<Mat<T> > &y)
     {
-        /* backward */
-        for (int i = states.size() - 2; i >= 0; i--) {
+        delta.clear();
+        delta_.clear();
+        for (int i = states.size() - 2; i >= 1; i--) {
             /* loss */
-            delta.y = states[i].y - y[i];
-            delta.h += param.Wp.Tr() * delta.y;
-            delta.h += param.Ui.Tr() * delta_future.i;
-            delta.h += param.Ua.Tr() * delta_future.a;
-            delta.h += param.Uf.Tr() * delta_future.f;
-            delta.h += param.Uo.Tr() * delta_future.o;
+            delta.y = (states[i].y - y[i]) * 2;
+            /* backward */
+            delta.h += P.Wp.Tr() * delta.y;
+            delta.h += P.Ui.Tr() * delta_.i;
+            delta.h += P.Ug.Tr() * delta_.g;
+            delta.h += P.Uf.Tr() * delta_.f;
+            delta.h += P.Uo.Tr() * delta_.o;
 
-            delta.o = delta.h % Tanh<DataType>::_(states[i + 1].s) % Sigmoid<DataType>::d(states[i].o);
-            delta.s = delta.h % states[i].o % Tanh<DataType>::d(states[i + 1].s) +
-                    delta_future.s % states[i + 1].f;
-            delta.f = delta.s % states[i].s % Sigmoid<DataType>::d(states[i].f);
-            delta.i = delta.s % states[i].a % Sigmoid<DataType>::d(states[i].i);
-            delta.a = delta.s % states[i].i % Sigmoid<DataType>::d(states[i].a);
+            delta.o = delta.h % Tanh<T>::_(states[i].c) % Sigmoid<T>::d(states[i].o);
+            delta.c = delta.h % states[i].o % Tanh<T>::d(states[i].c) +
+                    delta_.c % states[i + 1].f;
+            delta.f = delta.c % states[i - 1].c % Sigmoid<T>::d(states[i].f);
+            delta.i = delta.c % states[i].g % Sigmoid<T>::d(states[i].i);
+            delta.g = delta.c % states[i].i % Tanh<T>::d(states[i].g);
 
             /* gradient */
-            dParam.Wi += delta.i * x[i].Tr();
-            dParam.Wa += delta.a * x[i].Tr();
-            dParam.Wf += delta.f * x[i].Tr();
-            dParam.Wo += delta.o * x[i].Tr();
+            dP.Wi += delta.i * x[i].Tr();
+            dP.Wg += delta.g * x[i].Tr();
+            dP.Wf += delta.f * x[i].Tr();
+            dP.Wo += delta.o * x[i].Tr();
 
-            dParam.Ui += delta.i * states[i].h.Tr();
-            dParam.Ua += delta.a * states[i].h.Tr();
-            dParam.Uf += delta.f * states[i].h.Tr();
-            dParam.Uo += delta.o * states[i].h.Tr();
+            dP.Ui += delta.i * states[i - 1].h.Tr();
+            dP.Ug += delta.g * states[i - 1].h.Tr();
+            dP.Uf += delta.f * states[i - 1].h.Tr();
+            dP.Uo += delta.o * states[i - 1].h.Tr();
 
-            dParam.Bi += delta.i;
-            dParam.Ba += delta.a;
-            dParam.Bf += delta.f;
-            dParam.Bo += delta.o;
+            dP.Bi += delta.i;
+            dP.Bg += delta.g;
+            dP.Bf += delta.f;
+            dP.Bo += delta.o;
 
-            dParam.Wp += delta.y % Sigmoid<DataType>::d(states[i].y) * states[i + 1].h.Tr();
-            dParam.Bp += delta.y % Sigmoid<DataType>::d(states[i].y);
+            dP.Wp += (delta.y % Sigmoid<T>::d(states[i].y)) * states[i].h.Tr();
+            dP.Bp += delta.y % Sigmoid<T>::d(states[i].y);
             /* save */
-            delta_future = delta;
+            delta_ = delta;
         }
         states.clear();
         return;
@@ -233,65 +261,65 @@ public:
 
     void SGD(double learningRate)
     {
-        param.Wf -= dParam.Wf * learningRate;
-        param.Uf -= dParam.Uf * learningRate;
-        param.Bf -= dParam.Bf * learningRate;
+        P.Wf -= dP.Wf * learningRate;
+        P.Uf -= dP.Uf * learningRate;
+        P.Bf -= dP.Bf * learningRate;
 
-        param.Wi -= dParam.Wi * learningRate;
-        param.Ui -= dParam.Ui * learningRate;
-        param.Bi -= dParam.Bi * learningRate;
+        P.Wi -= dP.Wi * learningRate;
+        P.Ui -= dP.Ui * learningRate;
+        P.Bi -= dP.Bi * learningRate;
 
-        param.Wa -= dParam.Wa * learningRate;
-        param.Ua -= dParam.Ua * learningRate;
-        param.Ba -= dParam.Ba * learningRate;
+        P.Wg -= dP.Wg * learningRate;
+        P.Ug -= dP.Ug * learningRate;
+        P.Bg -= dP.Bg * learningRate;
 
-        param.Wo -= dParam.Wo * learningRate;
-        param.Uo -= dParam.Uo * learningRate;
-        param.Bo -= dParam.Bo * learningRate;
+        P.Wo -= dP.Wo * learningRate;
+        P.Uo -= dP.Uo * learningRate;
+        P.Bo -= dP.Bo * learningRate;
 
-        param.Wp -= dParam.Wp * learningRate;
-        param.Bp -= dParam.Bp * learningRate;
-        dParam.zero();
+        P.Wp -= dP.Wp * learningRate;
+        P.Bp -= dP.Bp * learningRate;
+        dP.zero();
         return;
     }
 
     void RMSProp(double rho, double learningRate)
     {
-        Sp.Wi = Sp.Wi * rho + (dParam.Wi % dParam.Wi) * (1 - rho);
-        Sp.Wa = Sp.Wa * rho + (dParam.Wa % dParam.Wa) * (1 - rho);
-        Sp.Wf = Sp.Wf * rho + (dParam.Wf % dParam.Wf) * (1 - rho);
-        Sp.Wo = Sp.Wo * rho + (dParam.Wo % dParam.Wo) * (1 - rho);
-        Sp.Wp = Sp.Wp * rho + (dParam.Wp % dParam.Wp) * (1 - rho);
+        Sp.Wi = Sp.Wi * rho + (dP.Wi % dP.Wi) * (1 - rho);
+        Sp.Wg = Sp.Wg * rho + (dP.Wg % dP.Wg) * (1 - rho);
+        Sp.Wf = Sp.Wf * rho + (dP.Wf % dP.Wf) * (1 - rho);
+        Sp.Wo = Sp.Wo * rho + (dP.Wo % dP.Wo) * (1 - rho);
+        Sp.Wp = Sp.Wp * rho + (dP.Wp % dP.Wp) * (1 - rho);
 
-        Sp.Ui = Sp.Ui * rho + (dParam.Ui % dParam.Ui) * (1 - rho);
-        Sp.Ua = Sp.Ua * rho + (dParam.Ua % dParam.Ua) * (1 - rho);
-        Sp.Uf = Sp.Uf * rho + (dParam.Uf % dParam.Uf) * (1 - rho);
-        Sp.Uo = Sp.Uo * rho + (dParam.Uo % dParam.Uo) * (1 - rho);
+        Sp.Ui = Sp.Ui * rho + (dP.Ui % dP.Ui) * (1 - rho);
+        Sp.Ug = Sp.Ug * rho + (dP.Ug % dP.Ug) * (1 - rho);
+        Sp.Uf = Sp.Uf * rho + (dP.Uf % dP.Uf) * (1 - rho);
+        Sp.Uo = Sp.Uo * rho + (dP.Uo % dP.Uo) * (1 - rho);
 
-        Sp.Bi = Sp.Bi * rho + (dParam.Bi % dParam.Bi) * (1 - rho);
-        Sp.Ba = Sp.Ba * rho + (dParam.Ba % dParam.Ba) * (1 - rho);
-        Sp.Bf = Sp.Bf * rho + (dParam.Bf % dParam.Bf) * (1 - rho);
-        Sp.Bo = Sp.Bo * rho + (dParam.Bo % dParam.Bo) * (1 - rho);
-        Sp.Bp = Sp.Bp * rho + (dParam.Bp % dParam.Bp) * (1 - rho);
+        Sp.Bi = Sp.Bi * rho + (dP.Bi % dP.Bi) * (1 - rho);
+        Sp.Bg = Sp.Bg * rho + (dP.Bg % dP.Bg) * (1 - rho);
+        Sp.Bf = Sp.Bf * rho + (dP.Bf % dP.Bf) * (1 - rho);
+        Sp.Bo = Sp.Bo * rho + (dP.Bo % dP.Bo) * (1 - rho);
+        Sp.Bp = Sp.Bp * rho + (dP.Bp % dP.Bp) * (1 - rho);
 
-        param.Wi -= dParam.Wi / (SQRT(Sp.Wi) + 1e-9) * learningRate;
-        param.Wa -= dParam.Wa / (SQRT(Sp.Wa) + 1e-9) * learningRate;
-        param.Wf -= dParam.Wf / (SQRT(Sp.Wf) + 1e-9) * learningRate;
-        param.Wo -= dParam.Wo / (SQRT(Sp.Wo) + 1e-9) * learningRate;
-        param.Wp -= dParam.Wp / (SQRT(Sp.Wp) + 1e-9) * learningRate;
+        P.Wi -= dP.Wi / (SQRT(Sp.Wi) + 1e-9) * learningRate;
+        P.Wg -= dP.Wg / (SQRT(Sp.Wg) + 1e-9) * learningRate;
+        P.Wf -= dP.Wf / (SQRT(Sp.Wf) + 1e-9) * learningRate;
+        P.Wo -= dP.Wo / (SQRT(Sp.Wo) + 1e-9) * learningRate;
+        P.Wp -= dP.Wp / (SQRT(Sp.Wp) + 1e-9) * learningRate;
 
-        param.Ui -= dParam.Ui / (SQRT(Sp.Ui) + 1e-9) * learningRate;
-        param.Ua -= dParam.Ua / (SQRT(Sp.Ua) + 1e-9) * learningRate;
-        param.Uf -= dParam.Uf / (SQRT(Sp.Uf) + 1e-9) * learningRate;
-        param.Uo -= dParam.Uo / (SQRT(Sp.Uo) + 1e-9) * learningRate;
+        P.Ui -= dP.Ui / (SQRT(Sp.Ui) + 1e-9) * learningRate;
+        P.Ug -= dP.Ug / (SQRT(Sp.Ug) + 1e-9) * learningRate;
+        P.Uf -= dP.Uf / (SQRT(Sp.Uf) + 1e-9) * learningRate;
+        P.Uo -= dP.Uo / (SQRT(Sp.Uo) + 1e-9) * learningRate;
 
-        param.Bi -= dParam.Bi / (SQRT(Sp.Bi) + 1e-9) * learningRate;
-        param.Ba -= dParam.Ba / (SQRT(Sp.Ba) + 1e-9) * learningRate;
-        param.Bf -= dParam.Bf / (SQRT(Sp.Bf) + 1e-9) * learningRate;
-        param.Bo -= dParam.Bo / (SQRT(Sp.Bo) + 1e-9) * learningRate;
-        param.Bp -= dParam.Bp / (SQRT(Sp.Bp) + 1e-9) * learningRate;
+        P.Bi -= dP.Bi / (SQRT(Sp.Bi) + 1e-9) * learningRate;
+        P.Bg -= dP.Bg / (SQRT(Sp.Bg) + 1e-9) * learningRate;
+        P.Bf -= dP.Bf / (SQRT(Sp.Bf) + 1e-9) * learningRate;
+        P.Bo -= dP.Bo / (SQRT(Sp.Bo) + 1e-9) * learningRate;
+        P.Bp -= dP.Bp / (SQRT(Sp.Bp) + 1e-9) * learningRate;
 
-        dParam.zero();
+        dP.zero();
         return;
     }
 };

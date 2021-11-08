@@ -50,13 +50,8 @@ public:
    Mat<T> E;
 public:
     SGD(){}
-    SGD(const SGD &sgd)
-    {
-        dW = sgd.dW;
-        dB = sgd.dB;
-        E = sgd.E;
-        return;
-    }
+    SGD(const SGD &sgd):dW(sgd.dW),dB(sgd.dB), E(sgd.E){}
+
     SGD& operator = (const SGD &sgd)
     {
         if (this == &sgd) {
@@ -114,16 +109,9 @@ public:
     Mat<T> Sb;
 public:
     RMSProp(){}
-    RMSProp(const RMSProp &rmsprop)
-    {
-        dW = rmsprop.dW;
-        dB = rmsprop.dB;
-        E = rmsprop.E;
-        Sw = rmsprop.Sw;
-        Sb = rmsprop.Sb;
-        rho = rmsprop.rho;
-        return;
-    }
+    RMSProp(const RMSProp &rmsprop):dW(rmsprop.dW),dB(rmsprop.dB),
+        E(rmsprop.E), Sw(rmsprop.Sw), Sb(rmsprop.Sb){}
+
     RMSProp& operator=(const RMSProp &rmsprop)
     {
         if (this == &rmsprop) {
@@ -198,19 +186,10 @@ public:
     T alpha2;
 public:
     Adam():alpha1(1), alpha2(1){}
-    Adam(const Adam &adam)
-    {
-        dW = adam.dW;
-        dB = adam.dB;
-        E = adam.E;
-        Sw = adam.Vw;
-        Sb = adam.Vb;
-        Vw = adam.Vw;
-        Vb = adam.Vb;
-        alpha1 = adam.alpha1;
-        alpha2 = adam.alpha2;
-        return;
-    }
+    Adam(const Adam &adam): dW(adam.dW), dB(adam.dB), E(adam.E),
+        Sw(adam.Vw), Sb(adam.Vb), Vw(adam.Vw), Vb(adam.Vb),
+        alpha1(adam.alpha1), alpha2(adam.alpha2){}
+
     Adam& operator=(const Adam &adam)
     {
         if (this == &adam) {
