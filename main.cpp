@@ -216,12 +216,12 @@ void test_lstm()
     for (int i = 0; i < 1000; i++) {
         std::vector<Mat<double> > batchData;
         std::vector<Mat<double> > batchTarget;
-        sample(batchData, batchTarget, 32);
+        sample(batchData, batchTarget, 8);
         lstm.forward(batchData);
         lstm.gradient(batchData, batchTarget);
-        lstm.RMSProp(0.9, 0.01);
+        lstm.RMSProp(0.9, 0.001);
     }
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         Mat<double> p(2, 1);
         double x = double(rand() % 1000) / 1000;
         double y = double(rand() % 1000) / 1000;

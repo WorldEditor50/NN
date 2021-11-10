@@ -205,11 +205,11 @@ public:
     void forward(const std::vector<Mat<T> > &seq)
     {
         state.clear();
-        for (auto &x : seq) {
-            states.push_back(state);
-            feedForward(x);
-        }
         states.push_back(state);
+        for (auto &x : seq) {  
+            feedForward(x);
+            states.push_back(state);
+        }
         return;
     }
 
@@ -217,9 +217,9 @@ public:
     {
         delta.clear();
         delta_.clear();
-        for (int i = states.size() - 2; i >= 1; i--) {
+        for (int t = states.size() - 2; t >= 1; t--) {
             /* loss */
-            delta.y = (states[i].y - y[i]) * 2;
+            delta.y = (states[t].y - y[t]) * 2;
             /* backward */
             delta.h += P.Wp.Tr() * delta.y;
             delta.h += P.Ui.Tr() * delta_.i;
@@ -227,31 +227,31 @@ public:
             delta.h += P.Uf.Tr() * delta_.f;
             delta.h += P.Uo.Tr() * delta_.o;
 
-            delta.o = delta.h % Tanh<T>::_(states[i].c) % Sigmoid<T>::d(states[i].o);
-            delta.c = delta.h % states[i].o % Tanh<T>::d(states[i].c) +
-                    delta_.c % states[i + 1].f;
-            delta.f = delta.c % states[i - 1].c % Sigmoid<T>::d(states[i].f);
-            delta.i = delta.c % states[i].g % Sigmoid<T>::d(states[i].i);
-            delta.g = delta.c % states[i].i % Tanh<T>::d(states[i].g);
+            delta.o = delta.h % Tanh<T>::_(states[t].c) % Sigmoid<T>::d(states[t].o);
+            delta.c = delta.h % states[t].o % Tanh<T>::d(states[t].c) +
+                    delta_.c % states[t + 1].f;
+            delta.f = delta.c % states[t - 1].c % Sigmoid<T>::d(states[t].f);
+            delta.i = delta.c % states[t].g % Sigmoid<T>::d(states[t].i);
+            delta.g = delta.c % states[t].i % Tanh<T>::d(states[t].g);
 
             /* gradient */
-            dP.Wi += delta.i * x[i].Tr();
-            dP.Wg += delta.g * x[i].Tr();
-            dP.Wf += delta.f * x[i].Tr();
-            dP.Wo += delta.o * x[i].Tr();
+            dP.Wi += delta.i * x[t].Tr();
+            dP.Wg += delta.g * x[t].Tr();
+            dP.Wf += delta.f * x[t].Tr();
+            dP.Wo += delta.o * x[t].Tr();
 
-            dP.Ui += delta.i * states[i - 1].h.Tr();
-            dP.Ug += delta.g * states[i - 1].h.Tr();
-            dP.Uf += delta.f * states[i - 1].h.Tr();
-            dP.Uo += delta.o * states[i - 1].h.Tr();
+            dP.Ui += delta.i * states[t - 1].h.Tr();
+            dP.Ug += delta.g * states[t - 1].h.Tr();
+            dP.Uf += delta.f * states[t - 1].h.Tr();
+            dP.Uo += delta.o * states[t - 1].h.Tr();
 
             dP.Bi += delta.i;
             dP.Bg += delta.g;
             dP.Bf += delta.f;
             dP.Bo += delta.o;
 
-            dP.Wp += (delta.y % Sigmoid<T>::d(states[i].y)) * states[i].h.Tr();
-            dP.Bp += delta.y % Sigmoid<T>::d(states[i].y);
+            dP.Wp += (delta.y % Sigmoid<T>::d(states[t].y)) * states[t].h.Tr();
+            dP.Bp += delta.y % Sigmoid<T>::d(states[t].y);
             /* save */
             delta_ = delta;
         }
